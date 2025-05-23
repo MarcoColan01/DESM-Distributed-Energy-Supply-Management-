@@ -1,6 +1,6 @@
-package it.sdp2025.administration.server;
+package it.sdp2025.tests;
 
-import it.sdp2025.administration.DebugCo2DTO;
+import it.sdp2025.administration.server.Co2Measurements;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 

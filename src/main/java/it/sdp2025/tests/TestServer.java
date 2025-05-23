@@ -1,4 +1,4 @@
-package it.sdp2025.administration.server;
+package it.sdp2025.tests;
 
 import it.sdp2025.proto.Co2Average;
 import it.sdp2025.proto.Co2AverageList;

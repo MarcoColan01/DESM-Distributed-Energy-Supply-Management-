@@ -1,4 +1,4 @@
-package it.sdp2025.administration.server;
+package it.sdp2025.tests;
 
 import it.sdp2025.proto.Co2Average;
 import it.sdp2025.proto.Co2AverageList;
@@ -6,25 +6,26 @@ import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
-public class Utility {
+public class MqttCo2Publisher {
     public static void main(String[] args) {
         String broker = "tcp://localhost:1883";
         String topic  = "desm/plant/plant1/co2";
         String clientId = MqttClient.generateClientId();
 
         try {
-            List<Co2Average> values = new ArrayList<>();
             long now = System.currentTimeMillis();
-            System.out.println("Sending values at timestamps: ");
-            for (int i = 0; i < 10; i++) {
-                long ts = now - (10_000 - i * 1000); // Spaziati 1 sec
-                System.out.printf("  • %.2f g at %d%n", 50 + i * 1.5, ts);
+            System.out.println("📤 Inviando dati CO₂ a: " + topic);
+            System.out.println("🕒 Ora attuale: " + now);
 
+            List<Co2Average> values = new ArrayList<>();
+            for (int i = 0; i < 5; i++) {
+                long ts = now - (5000 - i * 1000);  // da now - 5000 ms a now
+                double val = 50.0 + i * 2.5;
+                System.out.printf("   • %.2f g @ %d%n", val, ts);
                 values.add(Co2Average.newBuilder()
-                        .setAvg(50 + i * 1.5)
+                        .setAvg(val)
                         .setTimestamp(ts)
                         .build());
             }
@@ -43,7 +44,7 @@ public class Utility {
             MqttMessage msg = new MqttMessage(list.toByteArray());
             msg.setQos(1);
             client.publish(topic, msg);
-            System.out.println("✅ Published 10 CO₂ averages to " + topic);
+            System.out.println("✅ Dati pubblicati.");
 
             client.disconnect();
             client.close();

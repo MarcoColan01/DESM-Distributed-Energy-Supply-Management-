@@ -1,4 +1,4 @@
-package it.sdp2025.administration;
+package it.sdp2025.tests;
 
 public class DebugCo2DTO {
     private String plantId;

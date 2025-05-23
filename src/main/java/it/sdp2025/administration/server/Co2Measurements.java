@@ -1,6 +1,6 @@
 package it.sdp2025.administration.server;
 
-import it.sdp2025.administration.DebugCo2DTO;
+import it.sdp2025.tests.DebugCo2DTO;
 import it.sdp2025.proto.Co2Average;
 import org.springframework.stereotype.Component;
 

@@ -1,4 +1,4 @@
-package it.sdp2025.administration.server;
+package it.sdp2025.tests;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
