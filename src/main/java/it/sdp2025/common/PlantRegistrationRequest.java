@@ -1,23 +1,17 @@
 package it.sdp2025.common;
 
-public class PlantInfo {
+public class PlantRegistrationRequest {
     private String id;
-    private String host;
     private int grpcPort;
 
-    public PlantInfo(){}
-    public PlantInfo(String id, String host, int grpcPort){
+    public PlantRegistrationRequest(){};
+    public PlantRegistrationRequest(String id, int grpcPort){
         this.id = id;
-        this.host = host;
         this.grpcPort = grpcPort;
     }
 
     public String getId() {
         return id;
-    }
-
-    public String getHost() {
-        return host;
     }
 
     public int getGrpcPort() {
