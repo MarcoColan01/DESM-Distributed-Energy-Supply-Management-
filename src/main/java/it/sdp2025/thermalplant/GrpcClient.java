@@ -1,117 +1,92 @@
 package it.sdp2025.thermalplant;
 
+import it.sdp2025.common.PlantInfo;
+import it.sdp2025.proto.*;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
-import it.sdp2025.proto.*;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayDeque;
+import java.util.Queue;
 
 public class GrpcClient {
-    private final PlantConfig config;
-    private final PlantTopologyManager topology;
-    private final Map<String, ManagedChannel> channels = new HashMap<>();
-    private StreamObserver<ElectionEnvelope> outStream; //bidirezionale
 
-    public GrpcClient(PlantConfig config, PlantTopologyManager topology){
-        this.config = config;
-        this.topology = topology;
+    private final PlantConfig cfg;
+    private final ElectionManager election;
+
+    /* sincronizzati su `this` */
+    private ManagedChannel channel;
+    private StreamObserver<ElectionEnvelope> stream;
+    private String currentSuccId = null;
+    private final Queue<ElectionEnvelope> pending = new ArrayDeque<>();
+
+    public GrpcClient(PlantConfig cfg, ElectionManager election) {
+        this.cfg = cfg;
+        this.election = election;
     }
 
-    public void connectToSuccessor(){
-        PeerInfo successor = topology.getSuccessor();
-        if(successor == null){
-            System.out.println("GRPC CLIENT: nessun successore noto");
+    /* ------------------------------------------------------------------ */
+    /** (ri)apre il canale verso il successore indicato. */
+    public synchronized void connect(PlantInfo succ) {
+        if (succ == null) return;
+        if (succ.getId().equals(currentSuccId)) return;              // già connesso
+
+        /* 1) costruiamo **prima** il nuovo canale (+ stream) ----------- */
+        ManagedChannel newCh = ManagedChannelBuilder
+                .forAddress(succ.getHost(), succ.getPort())
+                .usePlaintext()
+                .build();
+
+        StreamObserver<ElectionEnvelope> newStream =
+                PlantRingGrpc.newStub(newCh).ringStream(new RingInbound());
+
+        /* 2) aggiorniamo gli handler atomici --------------------------- */
+        ManagedChannel oldCh = this.channel;
+        this.channel        = newCh;
+        this.stream         = newStream;
+        this.currentSuccId  = succ.getId();
+
+        System.out.printf("[gRPC-client] Stream verso %s aperto%n", succ.getId());
+
+        /* 3) ora che lo stream nuovo è attivo, chiudiamo il vecchio ---- */
+        if (oldCh != null && !oldCh.isShutdown()) oldCh.shutdownNow();
+        while (!pending.isEmpty()) stream.onNext(pending.poll());
+    }
+
+    public synchronized void sendElection(String candId, double price) {
+        ElectionMsg m = ElectionMsg.newBuilder()
+                .setCandidateId(candId)
+                .setPrice(price)
+                .build();
+        ElectionEnvelope env = ElectionEnvelope.newBuilder().setElection(m).build();
+
+        if (stream == null) {
+            System.out.printf("[gRPC-client] stream nullo → metto in coda (id=%s)%n", candId);
+            pending.add(env);
             return;
         }
-        openChannelIfAbsent(successor);
-        initRingStream(successor);
+        stream.onNext(env);
     }
 
-    public void reconnectToNewSuccessor(){
-        PeerInfo successor = topology.getSuccessor();
-        if(successor == null) return;
-        initRingStream(successor);
-    }
-
-    public void sendElectionToSuccessor(String candidateId){
-        ensureStream();
-        ElectionEnvelope envelope = ElectionEnvelope.newBuilder()
-                .setElection(ElectionMsg.newBuilder().setCandidateId(candidateId))
+    public synchronized void sendElected(String coordId) {
+        if (stream == null) return;
+        ElectedMsg m = ElectedMsg.newBuilder().setCoordinatorId(coordId)
                 .build();
-        outStream.onNext(envelope);
-        System.out.printf("[gRPC-client] → Election(%s)%n", candidateId);
+        stream.onNext(ElectionEnvelope.newBuilder().setElected(m).build());
     }
 
-    public void sendElectedToSuccessor(String coordinatorId){
-        ensureStream();
-        ElectionEnvelope envelope = ElectionEnvelope.newBuilder()
-                .setElected(ElectedMsg.newBuilder()
-                        .setCoordinatorId(coordinatorId).build()).build();
-        outStream.onNext(envelope);
-        System.out.printf("[gRPC-client] → Elected(%s)%n", coordinatorId);
-    }
-
-    public void helloToPeers(){
-        for(PeerInfo peer: topology.getPeers()){
-            if(peer.getId().equals(config.getId())) continue;
-            sendHello(peer);
+    /* ------------------------------------------------------------------ */
+    private class RingInbound implements StreamObserver<ElectionEnvelope> {
+        public void onNext(ElectionEnvelope env) {
+            if (env.hasElection())
+                election.onElection(env.getElection().getCandidateId(),
+                        env.getElection().getPrice());
+            else if (env.hasElected())
+                election.onElected(env.getElected().getCoordinatorId());
         }
-    }
-
-    private ManagedChannel openChannelIfAbsent(PeerInfo peer){
-        return channels.computeIfAbsent(peer.getId(), id ->
-                ManagedChannelBuilder.forAddress(peer.getHost(), peer.getPort()).usePlaintext().build());
-    }
-
-    private void initRingStream(PeerInfo successor) {
-        ManagedChannel channel = openChannelIfAbsent(successor);
-        PlantRingGrpc.PlantRingStub stub = PlantRingGrpc.newStub(channel);
-
-        if (outStream != null) {
-            try { outStream.onCompleted(); } catch (Exception ignored) {}
+        public void onError(Throwable t) {
+            System.err.println("[gRPC-stream] errore: " + t.getMessage());
         }
-
-        outStream = stub.ringStream(new StreamObserver<>() {
-            public void onNext(ElectionEnvelope envelope) {}
-            public void onError(Throwable throwable) {
-                System.err.println("[gRPC-client] errore stream: "+throwable.getMessage());
-            }
-            public void onCompleted() {}
-        });
-
-        System.out.printf("[gRPC-client] Stream verso successore %s aperto%n", successor.getId());
-    }
-
-    private void sendHello(PeerInfo peer) {
-        ManagedChannel channel = openChannelIfAbsent(peer);
-        PlantRingGrpc.PlantRingStub stub = PlantRingGrpc.newStub(channel);
-
-        HelloMsg msg = HelloMsg.newBuilder()
-                .setId(config.getId())
-                .setHost(config.getHost())
-                .setPort(config.getPort())
-                .build();
-
-        stub.hello(msg, new StreamObserver<>() {
-            public void onNext(com.google.protobuf.Empty empty) {}
-            public void onError(Throwable t) {
-                System.err.printf("[gRPC-client] hello a %s fallito: %s%n",
-                        peer.getId(), t.getMessage());
-            }
-            public void onCompleted() {
-                System.out.printf("[gRPC-client] hello completato con %s%n", peer.getId());
-            }
-        });
-    }
-
-    private void ensureStream() {
-        if (outStream == null) {
-            reconnectToNewSuccessor();
-            if (outStream == null)
-                throw new IllegalStateException("Stream non inizializzato");
-        }
+        public void onCompleted() {/* il successore si è spento */ }
     }
 }
-

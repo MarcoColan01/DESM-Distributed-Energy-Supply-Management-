@@ -1,51 +1,39 @@
 package it.sdp2025.thermalplant;
 
+import it.sdp2025.proto.EnergyRequest;
 import org.eclipse.paho.client.mqttv3.*;
 
 public class MqttEnergyRequestListener {
-    private final String BROKER = "tcp://localhost:1883";
-    private final String TOPIC = "desm/energy/request";
+
+    private static final String BROKER = "tcp://localhost:1883";
+    private static final String TOPIC  = "desm/energy/request";
     private final ElectionManager election;
-    private MqttClient client;
+    private final MqttClient client;
 
-    public MqttEnergyRequestListener(ElectionManager election){
+    public MqttEnergyRequestListener(ElectionManager election) throws MqttException {
         this.election = election;
+        this.client   = new MqttClient(BROKER, MqttClient.generateClientId());
     }
 
-    public void start(){
-        try{
-            client = new MqttClient(BROKER, MqttClient.generateClientId());
-            MqttConnectOptions connOpts = new MqttConnectOptions();
-            connOpts.setCleanSession(true);
-            client.setCallback(new MqttCallback() {
-                @Override
-                public void connectionLost(Throwable throwable) {
-                    System.err.println("[MQTT] Connessione persa: " + throwable.getMessage());
-                }
+    public void start() throws MqttException {
+        client.connect();
+        client.subscribe(TOPIC, 1, (topic, message) -> {
+            try {
+                /* 1. decodifica payload protobuf */
+                EnergyRequest req = EnergyRequest.parseFrom(message.getPayload());
 
-                @Override
-                public void messageArrived(String topic, MqttMessage message) throws Exception {
-                    try{
-                        int kwh = Integer.parseInt(new String(message.getPayload()).trim());
-                        long timestamp = System.currentTimeMillis();
-                        System.out.printf("[MQTT] Richiesta %d kWh%n", kwh);
-                        election.onNewEnergyRequest(kwh, timestamp);
-                    }catch (NumberFormatException e){
-                        e.printStackTrace();
-                    }
-                }
+                int  kwh = req.getKwh();
+                long ts  = req.getTimestamp();
+                System.out.printf("[MQTT] Richiesta %s: %d kWh%n",
+                        req.getRequestId(), kwh);
 
-                @Override
-                public void deliveryComplete(IMqttDeliveryToken iMqttDeliveryToken) {
-                    //
-                }
-            });
-            client.connect(connOpts);
-            client.subscribe(TOPIC, 1);
-            System.out.println("[MQTT] Sottoscritto a " + TOPIC);
-        }catch (MqttException e){
-            e.printStackTrace();
-        }
+                /* 2. innesca l’elezione */
+                election.onNewEnergyRequest(kwh, ts);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+        System.out.println("[MQTT] Sottoscritto a " + TOPIC);
     }
-
 }

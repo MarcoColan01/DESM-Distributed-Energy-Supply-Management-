@@ -31,7 +31,7 @@ public class CliThread implements Runnable{
                     System.out.println("Coordinator: " + election.getCoordinatorId());
                     System.out.println("My price:    " + election.getMyPrice());
                 }
-                case "start-election" -> {
+                case "election" -> {
                     election.onNewEnergyRequest(10000, System.currentTimeMillis());
                 }
                 case "show-topo" -> {
@@ -41,7 +41,7 @@ public class CliThread implements Runnable{
                             ? topology.getSuccessor().getId()
                             : "(none)"));
                 }
-                default -> System.out.println("Comandi: status, start-election, show-topo, quit");
+                default -> System.out.println("Comandi: status, election, show-topo, quit");
             }
         }
     }

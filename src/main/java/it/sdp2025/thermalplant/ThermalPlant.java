@@ -1,53 +1,126 @@
 package it.sdp2025.thermalplant;
 
-import java.util.Arrays;
+import it.sdp2025.administration.client.AdministrationClient;
+import it.sdp2025.common.PlantInfo;
 
+import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
+
+/**
+ * Processo di una centrale termoelettrica.
+ * <p>
+ * Sequenza di bootstrap:
+ * <ol>
+ *     <li>registrazione presso il server di amministrazione</li>
+ *     <li>avvio del server gRPC di questo impianto</li>
+ *     <li>popolamento della topologia e chiusura dell'anello</li>
+ *     <li>presentazione agli altri peer (HELLO)</li>
+ *     <li>sottoscrizione al topic MQTT delle richieste e avvio del simulatore del sensore</li>
+ *     <li>schedulazione dell'invio periodico delle medie di CO₂ al server</li>
+ * </ol>
+ * <p>
+ * N.B. – non si usano classi di {@code java.util.concurrent} per rispettare i vincoli
+ *       di progetto; la periodizzazione avviene con {@link java.util.Timer}.
+ */
 public class ThermalPlant {
 
-    private final PlantConfig config;
+    /* ==================== componenti =============================== */
+    private final PlantConfig              cfg;
+    private final GrpcClient               grpcClient;
+    private final PlantTopologyManager     topology;
+    private final ElectionManager          election;
+    private final GrpcServer               grpcServer;
+    private final MqttEnergyRequestListener mqttSub;
+    private final MqttPollutionPublisher   mqttPub;
+    private final PollutionSensorSimulator sensor;
+    private final CliThread                cli;
+    private final AdministrationClient     admin = new AdministrationClient();
 
-    private final PlantTopologyManager      topology;
-    private final ElectionManager           election;
-    private final GrpcServer server;
-    private final GrpcClient client;
-    private final MqttEnergyRequestListener mqtt;
-    private final TemporarySimulator           sensor;
-    private final CliThread                 cli;
+    /* timer per il push periodico delle medie                         */
+    private final Timer sensorTimer = new Timer(true);
 
-    public ThermalPlant(PlantConfig config) {
-        this.config       = config;
-        this.topology  = new PlantTopologyManager(config);
-        this.client = new GrpcClient(config, topology);
-        this.election  = new ElectionManager(config, topology, client);
-        this.server = new GrpcServer(config, new PlantRingServiceImpl(election, topology));
-        this.mqtt      = new MqttEnergyRequestListener(election);
-        this.sensor    = new TemporarySimulator(config.getId());
-        this.cli       = new CliThread(election, topology);
+    /* ---------------------------------------------------------------- */
+    public ThermalPlant(PlantConfig cfg) throws Exception {
+
+        this.cfg = cfg;
+
+        /* 1. costruiamo subito il client gRPC – l'ElectionManager        */
+        /*    verrà settato più avanti a causa delle dipendenze circolari */
+        this.grpcClient = new GrpcClient(cfg, /* election = */ null);
+
+        /* 2. topologia connessa al client (per riconnessioni dinamiche)  */
+        this.topology   = new PlantTopologyManager(cfg, grpcClient);
+
+        /* 3. ElectionManager completo delle altre due componenti         */
+        this.election   = new ElectionManager(cfg, topology, grpcClient);
+        grpcClient.setElectionManager(election);
+
+        /* 4. server gRPC                                                 */
+        this.grpcServer = new GrpcServer(
+                cfg,
+                new PlantRingServiceImpl(election, topology)
+        );
+
+        /* 5. MQTT                                                        */
+        this.mqttSub = new MqttEnergyRequestListener(election);
+        this.mqttPub = new MqttPollutionPublisher();
+
+        /* 6. simulatore sensore + CLI                                    */
+        this.sensor  = new PollutionSensorSimulator(cfg.getId());
+        this.cli     = new CliThread(election, topology);
+
+        /* 7. hook di terminazione                                        */
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("[Shutdown] chiusura canali gRPC|MQTT …");
+            sensorTimer.cancel();
+            mqttSub.shutdown();
+            grpcClient.shutdown();
+        }));
     }
 
-    public void start(String[] peerArgs) throws Exception {
-        server.start();
+    /* ================================================================= */
+    public void start() throws Exception {
 
-        Arrays.stream(peerArgs)
-                .filter(p -> p.startsWith("--peer="))
-                .map(p -> p.substring(7))
-                .forEach(this::addPeerFromArg);
+        /* 1. registrazione al server di amministrazione ---------------- */
+        System.out.printf("[Bootstrap] registrazione impianto %s …%n", cfg.getId());
+        List<PlantInfo> peers = admin.addPlant(cfg.getId(), cfg.getPort());
 
-        topology.buildRing();
+        /* 2. avvio del server gRPC (deve ascoltare prima dei possibili   */
+        /*    messaggi HELLO)                                             */
+        grpcServer.start();
 
-        client.connectToSuccessor();
-        client.helloToPeers();
+        /* 3. popolamento topologia & costruzione anello ---------------- */
+        /*    NB: aggiungiamo SEMPRE noi stessi prima di eventuali altri  */
+        topology.addPeer(cfg.getId(), cfg.getHost(), cfg.getPort());
+        for (PlantInfo p : peers) {
+            if (!p.getId().equals(cfg.getId()))
+                topology.addPeer(p.getId(), p.getHost(), p.getPort());
+        }
+        topology.buildRing();              // connette già il GrpcClient
 
-        mqtt.start();
+        /* 4. presentazione a tutti i peer ------------------------------ */
+        grpcClient.helloToPeers();
+
+        /* 5. MQTT subscription e simulatore sensore -------------------- */
+        mqttSub.start();
         sensor.start();
+
+        /* 6. schedulazione invio medie CO₂ ----------------------------- */
+        sensorTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                var averages = sensor.readAllAndClean();
+                if (!averages.isEmpty()) {
+                    mqttPub.publishAverages(cfg.getId(), System.currentTimeMillis(), averages);
+                }
+            }
+        }, 10_000L, 10_000L);
+
+        /* 7. CLI ------------------------------------------------------- */
         cli.start();
 
+        /* 8. hold main thread                                           */
         Thread.currentThread().join();
-    }
-
-    private void addPeerFromArg(String s) {
-        String[] parts = s.split(":");
-        if (parts.length != 3) return;
-        topology.addPeer(parts[0], parts[1], Integer.parseInt(parts[2]));
     }
 }

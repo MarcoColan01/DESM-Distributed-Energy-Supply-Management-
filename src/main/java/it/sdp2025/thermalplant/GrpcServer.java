@@ -3,24 +3,30 @@ package it.sdp2025.thermalplant;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import it.sdp2025.proto.PlantRingGrpc;
 
 public class GrpcServer {
     private final PlantConfig config;
-    private Server server;
+    private final Server server;
 
-    public GrpcServer(PlantConfig config, PlantRingServiceImpl serviceImpl){
+
+    public GrpcServer(PlantConfig config, PlantRingGrpc.PlantRingImplBase serviceImpl) {
         this.config = config;
-        this.server = ServerBuilder.forPort(config.getPort()).addService(serviceImpl).build();
+        this.server = ServerBuilder.forPort(config.getPort())
+                .addService(serviceImpl).build();
     }
 
-    public void start() throws Exception {
+    public void start() throws Exception{
         server.start();
-        System.out.println("[gRPC] Server avviato sulla porta " + config.getPort());
-        Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
+        System.out.println("Server avviato sulla porta " + config.getPort());
     }
 
     public void stop(){
         if(server != null) server.shutdown();
+    }
+
+    public void blockUntilShutdown() throws  InterruptedException{
+        if(server != null) server.awaitTermination();
     }
 }
 

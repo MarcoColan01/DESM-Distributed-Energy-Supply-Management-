@@ -3,87 +3,92 @@ package it.sdp2025.thermalplant;
 import java.util.Random;
 
 public class ElectionManager {
+
     private enum State { NON_PARTICIPANT, PARTICIPANT }
 
-    private final PlantConfig         cfg;
+    private final PlantConfig          cfg;
     private final PlantTopologyManager topology;
-    private final GrpcClient     client;
+    private final GrpcClient           client;
 
-    private volatile State            state         = State.NON_PARTICIPANT;
-    private volatile String           coordinatorId = null;
+    private volatile State  state         = State.NON_PARTICIPANT;
+    private volatile String coordinatorId = null;
 
-    /* -------------------------------- prezzo simulato ----------- */
-    private final Random rnd = new Random();
+    private final Random rnd  = new Random();
     private volatile double myPrice;
 
+    /* ----------------------------------------------------------- */
     public ElectionManager(PlantConfig cfg,
                            PlantTopologyManager topology,
                            GrpcClient client) {
-        this.cfg       = cfg;
-        this.topology  = topology;
-        this.client    = client;
+        this.cfg      = cfg;
+        this.topology = topology;
+        this.client   = client;
     }
 
-    /* ============================================================ */
-    /* === Trigger da MQTT: nuova richiesta energia =============== */
+    /* === trigger da MQTT ======================================= */
     public synchronized void onNewEnergyRequest(int kwh, long ts) {
-        // Genera un prezzo (0.1 – 0.9) – placeholder
         myPrice = 0.1 + rnd.nextDouble() * 0.8;
-
         System.out.printf("[Election] Nuova richiesta %dkWh, prezzo=%.3f – parte elezione%n",
                 kwh, myPrice);
 
-        // Avvia elezione solo se NON_PARTICIPANT
         if (state == State.NON_PARTICIPANT) {
             state = State.PARTICIPANT;
-            client.sendElectionToSuccessor(cfg.getId());
+            client.sendElection(cfg.getId(), myPrice);
         }
     }
 
-    /* ============================================================ */
-    /* === Ricezione messaggi ****************************************/
-
-    /** Riceve un messaggio Election(candidatoId) dal successore. */
-    public synchronized void onElection(String candidateId) {
-
-        int cmp = candidateId.compareTo(cfg.getId());
-
-        if (cmp == 0) {
-            // Sono di nuovo io ⇒ sono il coordinatore
+    public synchronized void onElection(String candId, double price) {
+        System.out.printf("[Election] ricevo <id=%s, price=%.3f>  (myPrice=%.3f)%n",
+                candId, price, myPrice);
+        /* 1. se il messaggio torna al candidato → coordinatore */
+        if (candId.equals(cfg.getId())) {
             coordinatorId = cfg.getId();
             state = State.NON_PARTICIPANT;
-            System.out.println("[Election] Eletto coordinatore: " + coordinatorId);
-            client.sendElectedToSuccessor(coordinatorId);
+            System.out.println("[Election] Io sono il coordinatore!");
+            client.sendElected(coordinatorId);
             return;
         }
 
-        if (cmp > 0) {              // candidatoId > myId
-            client.sendElectionToSuccessor(candidateId);   // inoltra
-            state = State.PARTICIPANT;
-        } else if (cmp < 0 && state == State.NON_PARTICIPANT) {
-            client.sendElectionToSuccessor(cfg.getId());   // propongo me
-            state = State.PARTICIPANT;
+        /* 2. verifica se il candidato in ingresso è migliore */
+        boolean better =
+                (price < myPrice) ||
+                        (price == myPrice && candId.compareTo(cfg.getId()) > 0);
+
+        if (better) {
+            /* inoltra il candidato migliore */
+            client.sendElection(candId, price);
+        } else {
+            /* candidato peggiore */
+            if (state == State.NON_PARTICIPANT) {
+                /* propongo me stesso (solo se NON_PARTICIPANT) */
+                client.sendElection(cfg.getId(), myPrice);
+                state = State.PARTICIPANT;
+            } else {
+            /* già participant → inoltro comunque il messaggio peggiore
+               per non interrompere l’anello                     */
+                client.sendElection(candId, price);
+            }
         }
-        // else (cmp < 0 && già participant) → scarto
+        /* se sono arrivato qui, rimango participant */
+        state = State.PARTICIPANT;
     }
 
-    /** Riceve un messaggio Elected(coordId) dal successore. */
+
     public synchronized void onElected(String coordId) {
         coordinatorId = coordId;
         state = State.NON_PARTICIPANT;
 
         if (!coordId.equals(cfg.getId())) {
             System.out.println("[Election] Coordinatore è " + coordId);
-            client.sendElectedToSuccessor(coordId);   // inoltra
+            client.sendElected(coordId);          // inoltra
         } else {
             System.out.println("[Election] Io sono il coordinatore!");
-            // TODO: qui l’impianto vincitore può iniziare la produzione
+            // qui potresti avviare la produzione
         }
     }
 
-    /* ======= Getter utili ======================================= */
+    /* --- getter ------------------------------------------------ */
     public String  getCoordinatorId() { return coordinatorId; }
     public boolean isCoordinator()    { return cfg.getId().equals(coordinatorId); }
     public double  getMyPrice()       { return myPrice; }
 }
-
