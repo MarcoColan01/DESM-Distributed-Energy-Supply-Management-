@@ -1,0 +1,65 @@
+package it.sdp2025.plant;
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
+import it.sdp2025.common.PlantInfo;
+import it.sdp2025.simulator.SensorModule;
+
+import java.util.List;
+import java.util.Random;
+import java.util.stream.Collectors;
+
+public final class ThermalPlantMain {
+
+    public static void main(String[] args) throws Exception {
+        final Random rnd = new Random();
+
+        /* 1 ▸ parte un thread che chiede i parametri */
+        CliThread cli = new CliThread();
+        cli.start();
+        CliThread.Params p = cli.waitParams();
+
+        /* 2 ▸ registra la centrale presso l’Admin-Server */
+        PlantRegistration admin = new PlantRegistration(p.adminHost, p.adminPort);
+        List<PlantInfo> peers = admin.register(p.id, p.grpcPort);
+        System.out.println("[ADMIN] registrato – peer ricevuti: " + peers.size());
+
+        /* 3 ▸ bootstrap rete P2P */
+        TopologyManager topo = new TopologyManager(p.id);
+        topo.initRing(
+                peers.stream().map(PlantInfo::getId).collect(Collectors.toList())
+        );
+
+        GrpcClient grpcClient = new GrpcClient();
+        grpcClient.announceJoinAll(new PlantInfo(p.id,"localhost",p.grpcPort), peers);
+
+        ElectionManager elect = new ElectionManager(p.id, topo, grpcClient);
+
+        Server server = ServerBuilder.forPort(p.grpcPort)
+                .addService(new GrpcServer(elect, topo))
+                .build().start();
+        System.out.printf("[gRPC] %s listening on %d%n", p.id, p.grpcPort);
+
+        MqttEnergySubscriber sub = new MqttEnergySubscriber(
+                p.mqttBroker,
+                req -> {
+                    double price = 0.1 + (0.8 * rnd.nextDouble());  // 0.1-0.9
+                    elect.startElectionIfFree(price, req.getTimestamp());
+                });
+        sub.connect();
+
+
+        /* 5 ▸ sensore inquinamento */
+        SensorModule.start(p.id, p.mqttBroker);
+
+        /* 6 ▸ ciclo produzione */
+        while (true) {
+            if (elect.isCoordinatorFor(sub.lastTimestamp())) {
+                int qty = sub.lastQuantity();
+                System.out.printf("[%s] PRODUZIONE di %d kWh%n", p.id, qty);
+                Thread.sleep(qty);
+                elect.clearBusy();
+            }
+            Thread.sleep(50);
+        }
+    }
+}

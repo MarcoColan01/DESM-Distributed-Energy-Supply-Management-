@@ -1,0 +1,25 @@
+syntax = "proto3";
+package it.sdp2025;
+import "google/protobuf/empty.proto";
+
+
+message PlantInfoMsg {
+  string id   = 1;
+  string host = 2;
+  int32  port = 3;
+}
+
+/* —— Election —— */
+enum ElecType { ELECTION = 0; ELECTED = 1; }
+
+message ElectionMsg {
+  ElecType type      = 1;
+  string   candidate = 2;     // id del candidato / coordinatore
+  double   price     = 3;     // solo per ELECTION
+  int64    reqTs     = 4;     // timestamp richiesta energia (per distinguere più gare)
+}
+
+service PlantService {
+  rpc forwardElection   (ElectionMsg) returns (google.protobuf.Empty);
+  rpc announceJoin      (PlantInfoMsg) returns (google.protobuf.Empty);
+}

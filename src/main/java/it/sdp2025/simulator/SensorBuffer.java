@@ -20,4 +20,3 @@ public final class SensorBuffer implements Buffer {
         return copy;
     }
 }
-

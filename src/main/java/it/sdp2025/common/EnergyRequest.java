@@ -8,4 +8,12 @@ public final class EnergyRequest {
         this.kwhQty = kwhQty;
         this.timestamp = timestamp;
     }
+
+    public int getKwhQty() {
+        return kwhQty;
+    }
+
+    public long getTimestamp() {
+        return timestamp;
+    }
 }
