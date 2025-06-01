@@ -13,11 +13,12 @@ message PlantInfoMsg {
 enum ElecType { ELECTION = 0; ELECTED = 1; }
 
 message ElectionMsg {
-  ElecType type      = 1;
-  string   candidate = 2;     // id del candidato / coordinatore
-  double   price     = 3;     // solo per ELECTION
-  int64    reqTs     = 4;     // timestamp richiesta energia (per distinguere più gare)
+  double offer = 1;
+  int64 timestamp = 2;
+  string bestId = 3;
+  string initiatorId = 4;
 }
+
 
 service PlantService {
   rpc forwardElection   (ElectionMsg) returns (google.protobuf.Empty);

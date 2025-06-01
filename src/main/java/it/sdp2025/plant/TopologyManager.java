@@ -24,8 +24,16 @@ public final class TopologyManager {
         }
     }
 
+    /** Successore del mio nodo */
     public synchronized String getSuccessor() {
         int idx = ring.indexOf(myId);
+        return ring.get((idx + 1) % ring.size());
+    }
+
+    /** Successore di qualunque nodo */
+    public synchronized String getNextPeer(String id) {
+        int idx = ring.indexOf(id);
+        if (idx == -1) throw new IllegalArgumentException("ID non presente nella topologia: " + id);
         return ring.get((idx + 1) % ring.size());
     }
 
@@ -33,7 +41,5 @@ public final class TopologyManager {
         return myId;
     }
 
-    /* versione thread-safe della lista per debug / CLI */
     public synchronized List<String> getPlants() { return new ArrayList<>(ring); }
 }
-

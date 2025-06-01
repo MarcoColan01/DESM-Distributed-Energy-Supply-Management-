@@ -20,21 +20,33 @@ public class GrpcServer extends PlantServiceGrpc.PlantServiceImplBase {
     @Override
     public void forwardElection(PlantNetwork.ElectionMsg request,
                                 StreamObserver<Empty> responseObserver) {
-        electionMgr.onElection(request);
-        responseObserver.onNext(com.google.protobuf.Empty.getDefaultInstance());
-        responseObserver.onCompleted();
+        try {
+            System.out.printf("[GrpcServer] Received forwardElection from %s%n", request.getInitiatorId());
+            electionMgr.handleElection(request);
+            responseObserver.onNext(Empty.getDefaultInstance());
+            responseObserver.onCompleted();
+            System.out.println("[GrpcServer] forwardElection: response sent and completed.");
+        } catch (Exception e) {
+            responseObserver.onError(e);
+            System.err.println("[GrpcServer] forwardElection: error occurred.");
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void announceJoin(PlantNetwork.PlantInfoMsg req, StreamObserver<Empty> resp) {
-        topo.addPlant(req.getId());
-        client.connect(req.getId(), req.getHost(), req.getPort());  // <--- AGGIUNGI QUESTO!
-        System.out.printf("[%s] RING (post-join) → %s%n",
-                topo.getMyId(), topo.getPlants());
-        resp.onNext(Empty.getDefaultInstance());
-        resp.onCompleted();
+        try {
+            System.out.printf("[GrpcServer] Received announceJoin from %s%n", req.getId());
+            topo.addPlant(req.getId());
+            client.connect(req.getId(), req.getHost(), req.getPort());
+            System.out.printf("[%s] RING (post-join) → %s%n", topo.getMyId(), topo.getPlants());
+            resp.onNext(Empty.getDefaultInstance());
+            resp.onCompleted();
+            System.out.println("[GrpcServer] announceJoin: response sent and completed.");
+        } catch (Exception e) {
+            resp.onError(e);
+            System.err.println("[GrpcServer] announceJoin: error occurred.");
+            e.printStackTrace();
+        }
     }
-
-
 }
-
