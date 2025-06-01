@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 public final class ThermalPlantMain {
 
     public static void main(String[] args) throws Exception {
+        System.setProperty("io.netty.tryReflectionSetAccessible", "false");
         final Random rnd = new Random();
 
         /* 1 ▸ parte un thread che chiede i parametri */
@@ -28,6 +29,8 @@ public final class ThermalPlantMain {
         topo.initRing(
                 peers.stream().map(PlantInfo::getId).collect(Collectors.toList())
         );
+        /* dopo topo.init(...) */
+        System.out.printf("[%s] RING → %s%n", p.id, topo.getPlants());
 
         GrpcClient grpcClient = new GrpcClient();
         grpcClient.announceJoinAll(new PlantInfo(p.id,"localhost",p.grpcPort), peers);
@@ -35,15 +38,18 @@ public final class ThermalPlantMain {
         ElectionManager elect = new ElectionManager(p.id, topo, grpcClient);
 
         Server server = ServerBuilder.forPort(p.grpcPort)
-                .addService(new GrpcServer(elect, topo))
+                .addService(new GrpcServer(elect, topo, grpcClient))
                 .build().start();
         System.out.printf("[gRPC] %s listening on %d%n", p.id, p.grpcPort);
 
         MqttEnergySubscriber sub = new MqttEnergySubscriber(
                 p.mqttBroker,
                 req -> {
-                    double price = 0.1 + (0.8 * rnd.nextDouble());  // 0.1-0.9
+                    double price = 0.1 + 0.8 * rnd.nextDouble();
+                    System.out.printf("[%s] OFFERTA %.3f $/kWh per req %d%n",
+                            p.id, price, req.getTimestamp());
                     elect.startElectionIfFree(price, req.getTimestamp());
+
                 });
         sub.connect();
 

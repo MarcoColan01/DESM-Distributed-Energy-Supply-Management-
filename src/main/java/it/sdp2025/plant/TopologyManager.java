@@ -20,12 +20,17 @@ public final class TopologyManager {
     public synchronized void addPlant(String id) {
         if (!ring.contains(id)) {
             ring.add(id); Collections.sort(ring);
+            System.out.printf("[%s] RING → %s%n", myId, ring);
         }
     }
 
-    public synchronized String successor() {
+    public synchronized String getSuccessor() {
         int idx = ring.indexOf(myId);
         return ring.get((idx + 1) % ring.size());
+    }
+
+    public synchronized String getMyId(){
+        return myId;
     }
 
     /* versione thread-safe della lista per debug / CLI */
