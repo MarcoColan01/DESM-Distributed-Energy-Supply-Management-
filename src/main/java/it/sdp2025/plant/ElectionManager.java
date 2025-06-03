@@ -28,6 +28,7 @@ public class ElectionManager {
     private boolean busy;
     private boolean isCoordinator;
     private boolean isProducing;
+    private long lastPrintedTs = -1;
 
     /* ---------------------- costruttore ----------------------------- */
 
@@ -106,9 +107,19 @@ public class ElectionManager {
 
         /* 1) Se sto già gestendo un’elezione *diversa*, passo il token. */
         if (busy && currentTimestamp != ts) {
-            forwardToken(msg);
+
+    /* Stampa "coordinatore eletto" una sola volta per questo timestamp,
+       anche se la centrale è impegnata a produrre.                    */
+            if (ts != lastPrintedTs) {
+                System.out.printf("[%s] Coordinatore eletto: %s (%.3f) per richiesta %d%n",
+                        nodeId, msg.getBestId(), msg.getOffer(), ts);
+                lastPrintedTs = ts;
+            }
+
+            forwardToken(msg);   // passa comunque il token
             return;
         }
+
 
         /* 2) Aggiorna lo stato per *questa* elezione. */
         busy             = true;
@@ -155,7 +166,6 @@ public class ElectionManager {
         new Thread(() -> grpcClient.forwardElection(next, msg)).start();
     }
 
-    /** Aggiorna i flag e stampa il risultato dell’elezione. */
     private void becomeCoordinator() {
         isCoordinator = nodeId.equals(bestOfferId);
 
@@ -166,7 +176,9 @@ public class ElectionManager {
             System.out.printf("[%s] Coordinatore eletto: %s (%.3f) per richiesta %d%n",
                     nodeId, bestOfferId, bestOffer, currentTimestamp);
         }
+        lastPrintedTs = currentTimestamp;   // evita di ristampare
     }
+
 
     /** Riporta la centrale allo stato “idle” (nessuna elezione in corso). */
     private void clearBusy() {
