@@ -38,7 +38,7 @@ public final class GrpcClient {
             }
             public void onError(Throwable t) {
                 System.err.printf("[GrpcClient] forwardElection: ERROR from %s: %s%n", idSucc, t);
-                t.printStackTrace();
+                //t.printStackTrace();
             }
             public void onCompleted() {
                 System.out.printf("[GrpcClient] forwardElection: completed with %s%n", idSucc);
@@ -58,7 +58,7 @@ public final class GrpcClient {
                 }
                 public void onError(Throwable t) {
                     System.err.printf("[GrpcClient] announceJoin: ERROR from %s: %s%n", p.getId(), t);
-                    t.printStackTrace();
+                    //t.printStackTrace();
                 }
                 public void onCompleted() {
                     System.out.printf("[GrpcClient] announceJoin: completed with %s%n", p.getId());

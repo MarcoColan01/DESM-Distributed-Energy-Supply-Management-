@@ -8,12 +8,16 @@ public final class CliThread extends Thread {
 
     public static final class Params {
         public final String id;
-        public final int    grpcPort;
+        public final int grpcPort;
         public final String adminHost;
-        public final int    adminPort;
+        public final int adminPort;
         public final String mqttBroker;
-        private Params(String i,int gp,String ah,int ap,String mb){
-            id=i;grpcPort=gp;adminHost=ah;adminPort=ap;mqttBroker=mb;
+        private Params(String id, int grpcPort, String adminHost, int adminPort, String mqttBroker){
+            this.id = id;
+            this.grpcPort = grpcPort;
+            this.adminPort = adminPort;
+            this.mqttBroker = mqttBroker;
+            this.adminHost = adminHost;
         }
     }
 
@@ -28,19 +32,11 @@ public final class CliThread extends Thread {
         System.out.print("Inserisci porta gRPC                > ");
         int grpcPort = Integer.parseInt(in.nextLine().trim());
 
-        System.out.print("Host Administration Server [localhost] > ");
-        String aHost = in.nextLine().trim();
-        if (aHost.isEmpty()) aHost = "localhost";
-
-        System.out.print("Porta Administration Server [8080]  > ");
-        String aPortStr = in.nextLine().trim();
-        int aPort = aPortStr.isEmpty() ? 8080 : Integer.parseInt(aPortStr);
-
-        System.out.print("Broker MQTT [tcp://localhost:1883]  > ");
-        String broker = in.nextLine().trim();
-        if (broker.isEmpty()) broker = "tcp://localhost:1883";
-
-        params = new Params(id, grpcPort, aHost, aPort, broker);
+        params = new Params(id,
+                grpcPort,
+                "localhost",
+                8080,
+                "tcp://localhost:1883");
     }
 
     /** bloccante finché l’utente non ha finito */
