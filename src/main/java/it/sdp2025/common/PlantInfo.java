@@ -1,12 +1,14 @@
 package it.sdp2025.common;
 
+import org.jetbrains.annotations.NotNull;
+
 public class PlantInfo {
     private String id;
     private String host;
     private int grpcPort;
 
     public PlantInfo(){}
-    public PlantInfo(String id, String host, int grpcPort){
+    public PlantInfo(@NotNull String id, @NotNull String host, int grpcPort){
         this.id = id;
         this.host = host;
         this.grpcPort = grpcPort;

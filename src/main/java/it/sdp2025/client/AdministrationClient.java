@@ -29,6 +29,7 @@ public class AdministrationClient {
                 case "2" -> calculateAverage();
                 case "3" -> listOfMeasurements();
                 case "0" -> System.exit(0);
+                default -> System.out.println("Comando non riconosciuto");
             }
         }
     }
@@ -46,8 +47,14 @@ public class AdministrationClient {
     }
 
     private void calculateAverage(){
-        System.out.print("t1 (ms): "); long t1 = Long.parseLong(in.nextLine());
-        System.out.print("t2 (ms): "); long t2 = Long.parseLong(in.nextLine());
+        System.out.print("t1 (ms): ");
+        long t1 = Long.parseLong(in.nextLine());
+        System.out.print("t2 (ms): ");
+        long t2 = Long.parseLong(in.nextLine());
+        if(t1 >= t2){
+            System.out.println("L'inizio dell'intervallo non può essere successivo alla fine");
+            return;
+        }
         String url = SERVER_ADDRESS + "/emissions/average?t1=" + t1 + "&t2=" + t2;
         ResponseEntity<Double> r = http.getForEntity(url, Double.class);
         if (r.getStatusCode().is2xxSuccessful())

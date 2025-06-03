@@ -4,22 +4,21 @@ import com.google.protobuf.Empty;
 import io.grpc.stub.StreamObserver;
 import it.sdp2025.PlantNetwork;
 import it.sdp2025.PlantServiceGrpc;
+import org.jetbrains.annotations.NotNull;
 
 public class GrpcServer extends PlantServiceGrpc.PlantServiceImplBase {
-
     private final ElectionManager electionMgr;
     private final TopologyManager topo;
     private final GrpcClient client;
 
-    public GrpcServer(ElectionManager e, TopologyManager t, GrpcClient client) {
+    public GrpcServer(@NotNull ElectionManager e, @NotNull TopologyManager t, @NotNull GrpcClient client) {
         this.electionMgr = e;
         this.topo = t;
         this.client = client;
     }
 
     @Override
-    public void forwardElection(PlantNetwork.ElectionMsg request,
-                                StreamObserver<Empty> responseObserver) {
+    public void forwardElection(@NotNull PlantNetwork.ElectionMsg request, @NotNull StreamObserver<Empty> responseObserver) {
         try {
             System.out.printf("[GrpcServer] Received forwardElection from %s%n", request.getInitiatorId());
             electionMgr.handleElection(request);
@@ -34,19 +33,19 @@ public class GrpcServer extends PlantServiceGrpc.PlantServiceImplBase {
     }
 
     @Override
-    public void announceJoin(PlantNetwork.PlantInfoMsg req, StreamObserver<Empty> resp) {
+    public void announceJoin(@NotNull PlantNetwork.PlantInfoMsg request, @NotNull StreamObserver<Empty> responseObserver) {
         try {
-            System.out.printf("[GrpcServer] Received announceJoin from %s%n", req.getId());
-            topo.addPlant(req.getId());
-            client.connect(req.getId(), req.getHost(), req.getPort());
+            System.out.printf("[GrpcServer] Received announceJoin from %s%n", request.getId());
+            topo.addPlant(request.getId());
+            client.connect(request.getId(), request.getHost(), request.getPort());
             System.out.printf("[%s] RING (post-join) → %s%n", topo.getMyId(), topo.getPlants());
-            resp.onNext(Empty.getDefaultInstance());
-            resp.onCompleted();
+            responseObserver.onNext(Empty.getDefaultInstance());
+            responseObserver.onCompleted();
             System.out.println("[GrpcServer] announceJoin: response sent and completed.");
         } catch (Exception e) {
-            resp.onError(e);
+            responseObserver.onError(e);
             System.err.println("[GrpcServer] announceJoin: error occurred.");
-            e.printStackTrace();
+            //e.printStackTrace();
         }
     }
 }

@@ -1,39 +1,35 @@
 package it.sdp2025.plant;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 public final class TopologyManager {
-    private final List<String> ring = new ArrayList<>(); // ID ordinati
+    private final List<String> ring = new ArrayList<>();
     private final String myId;
 
-    public TopologyManager(String myId) { this.myId = myId; }
+    public TopologyManager(@NotNull String myId) {
+        this.myId = myId;
+    }
 
-    public synchronized void initRing(List<String> ids) {
+    public synchronized void initRing(@NotNull List<String> ids) {
         ring.clear();
         ring.addAll(ids);
-        Collections.sort(ring);        // ordinamento logico
+        Collections.sort(ring);
         if (!ring.contains(myId)) ring.add(myId);
     }
 
-    public synchronized void addPlant(String id) {
+    public synchronized void addPlant(@NotNull String id) {
         if (!ring.contains(id)) {
             ring.add(id); Collections.sort(ring);
             System.out.printf("[%s] RING → %s%n", myId, ring);
         }
     }
 
-    /** Successore del mio nodo */
     public synchronized String getSuccessor() {
         int idx = ring.indexOf(myId);
-        return ring.get((idx + 1) % ring.size());
-    }
-
-    /** Successore di qualunque nodo */
-    public synchronized String getNextPeer(String id) {
-        int idx = ring.indexOf(id);
-        if (idx == -1) throw new IllegalArgumentException("ID non presente nella topologia: " + id);
         return ring.get((idx + 1) % ring.size());
     }
 
@@ -41,5 +37,7 @@ public final class TopologyManager {
         return myId;
     }
 
-    public synchronized List<String> getPlants() { return new ArrayList<>(ring); }
+    public synchronized List<String> getPlants() {
+        return new ArrayList<>(ring);
+    }
 }

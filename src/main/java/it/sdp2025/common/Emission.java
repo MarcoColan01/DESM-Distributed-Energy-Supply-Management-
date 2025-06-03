@@ -10,7 +10,7 @@ public class Emission implements Comparable<Emission>{
     private long timestamp;
 
     public Emission(){}
-    public Emission(String id, String type, double value, long timestamp) {
+    public Emission(@NotNull String id, @NotNull String type, double value, long timestamp) {
         this.value = value;
         this.timestamp = timestamp;
         this.id=id;

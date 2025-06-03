@@ -13,7 +13,6 @@ public final class ThermalPlantMain {
 
     public static void main(String[] args) throws Exception {
         final Random rnd = new Random();
-
         CliThread cli = new CliThread();
         cli.start();
         CliThread.Params p = cli.waitParams();
@@ -47,20 +46,17 @@ public final class ThermalPlantMain {
                     elect.startElectionIfFree(price, req.getTimestamp());
                 });
         sub.connect();
-
         SensorModule.start(p.id, p.mqttBroker);
 
         while (true) {
             if (elect.isCoordinatorFor(sub.lastTimestamp()) && !elect.isProducing()) {
-
                 int qty = sub.lastQuantity();
                 System.out.printf("[%s] PRODUZIONE di %d kWh%n", p.id, qty);
-
-                elect.setProducing(true);          // blocca la centrale
-                Thread.sleep(qty);                 // 1 ms × kWh richiesti
+                elect.setProducing(true);
+                Thread.sleep(qty);
                 System.out.printf("[%s] FINITO PRODUZIONE%n", p.id);
 
-                elect.productionFinished();        // libera lo stato
+                elect.productionFinished();
             }
             Thread.sleep(50);
         }

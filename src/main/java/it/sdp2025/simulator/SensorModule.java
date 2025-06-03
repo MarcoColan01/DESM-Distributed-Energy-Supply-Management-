@@ -7,13 +7,11 @@ import java.util.*;
 
 
 public final class SensorModule {
-
-    private static final int   WINDOW_SIZE = 8;
-    private static final int   SLIDE       = 4;     // 50 % overlap
-    private static final Gson  gson        = new Gson();
-
+    private static final int WINDOW_SIZE = 8;
+    private static final int SLIDE = 4;
+    private static final Gson  gson = new Gson();
     private static PollutionSensor sensorThread;
-    private static Thread          computeThread;
+    private static Thread computeThread;
     private static final List<Double> window = new ArrayList<>();
     private static final List<Double> averagesToSend = new ArrayList<>();
     private static Buffer sharedBuffer;
@@ -21,15 +19,12 @@ public final class SensorModule {
     private static String brokerUrl;
 
     private SensorModule() {}
-
     public static void start(String id, String mqttBroker) {
         plantId   = id;
         brokerUrl = mqttBroker;
         sharedBuffer = new SensorBuffer();
-
         sensorThread = new PollutionSensor(id, sharedBuffer);
         sensorThread.start();
-
         computeThread = new Thread(SensorModule::computeLoop, "SensorCompute-"+id);
         computeThread.setDaemon(true);
         computeThread.start();
@@ -37,7 +32,6 @@ public final class SensorModule {
 
     private static void computeLoop() {
         long lastPublish = System.currentTimeMillis();
-
         while (true) {
             List<Measurement> chunk = sharedBuffer.readAllAndClean();
             for (Measurement m : chunk) {
@@ -51,14 +45,14 @@ public final class SensorModule {
                     window.subList(0, SLIDE).clear();
                 }
             }
-
             long now = System.currentTimeMillis();
             if (now - lastPublish >= 10_000) {
                 publishAverages(now);
                 lastPublish = now;
             }
-
-            try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {}
         }
     }
 

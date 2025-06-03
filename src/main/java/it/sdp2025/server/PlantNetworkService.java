@@ -1,6 +1,7 @@
 package it.sdp2025.server;
 
 import it.sdp2025.common.PlantInfo;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -16,7 +17,7 @@ public class PlantNetworkService {
         return new ArrayList<>(plants.values());
     }
 
-    public synchronized List<PlantInfo> registerPlant(PlantInfo plant) throws IllegalStateException{
+    public synchronized List<PlantInfo> registerPlant(@NotNull PlantInfo plant) throws IllegalStateException{
         if(plants.containsKey(plant.getId())) throw new IllegalStateException("Duplicated id " + plant.getId());
         plants.put(plant.getId(), plant);
         List<PlantInfo> others = new ArrayList<>(plants.values());

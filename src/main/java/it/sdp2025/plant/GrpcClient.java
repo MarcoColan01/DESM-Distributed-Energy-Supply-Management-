@@ -6,27 +6,26 @@ import io.grpc.stub.StreamObserver;
 import it.sdp2025.PlantNetwork;
 import it.sdp2025.PlantServiceGrpc;
 import it.sdp2025.common.PlantInfo;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
 public final class GrpcClient {
-
     private final Map<String, PlantServiceGrpc.PlantServiceStub> stubs = new HashMap<>();
     private final Map<String, ManagedChannel> channels = new HashMap<>();
 
-    public void connect(String id, String host, int port) {
-        if (stubs.containsKey(id)) return; // già connesso
-        ManagedChannel ch = ManagedChannelBuilder.forAddress(host, port)
-                .usePlaintext().build();
+    public void connect(@NotNull String id, @NotNull String host, int port) {
+        if (stubs.containsKey(id)) return;
+        ManagedChannel ch = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
         PlantServiceGrpc.PlantServiceStub stub = PlantServiceGrpc.newStub(ch);
         stubs.put(id, stub);
         channels.put(id, ch);
         System.out.printf("[GrpcClient] Connected to %s at %s:%d%n", id, host, port);
     }
 
-    public void forwardElection(String idSucc, PlantNetwork.ElectionMsg msg) {
+    public void forwardElection(@NotNull String idSucc, @NotNull PlantNetwork.ElectionMsg msg) {
         PlantServiceGrpc.PlantServiceStub stub = stubs.get(idSucc);
         if (stub == null) {
             System.err.printf("[GrpcClient] No stub for %s%n", idSucc);
@@ -38,7 +37,6 @@ public final class GrpcClient {
             }
             public void onError(Throwable t) {
                 System.err.printf("[GrpcClient] forwardElection: ERROR from %s: %s%n", idSucc, t);
-                //t.printStackTrace();
             }
             public void onCompleted() {
                 System.out.printf("[GrpcClient] forwardElection: completed with %s%n", idSucc);
@@ -46,7 +44,7 @@ public final class GrpcClient {
         });
     }
 
-    public void announceJoinAll(PlantInfo me, Collection<PlantInfo> peers) {
+    public void announceJoinAll(@NotNull PlantInfo me, @NotNull Collection<PlantInfo> peers) {
         PlantNetwork.PlantInfoMsg self = PlantNetwork.PlantInfoMsg.newBuilder()
                 .setId(me.getId()).setHost(me.getHost()).setPort(me.getGrpcPort()).build();
         for (PlantInfo p : peers) {
@@ -58,7 +56,6 @@ public final class GrpcClient {
                 }
                 public void onError(Throwable t) {
                     System.err.printf("[GrpcClient] announceJoin: ERROR from %s: %s%n", p.getId(), t);
-                    //t.printStackTrace();
                 }
                 public void onCompleted() {
                     System.out.printf("[GrpcClient] announceJoin: completed with %s%n", p.getId());
@@ -67,7 +64,6 @@ public final class GrpcClient {
         }
     }
 
-    // Utilità: chiusura canali quando tutto è finito (da chiamare a fine programma)
     public void shutdown() {
         for (var ch : channels.values()) {
             ch.shutdownNow();

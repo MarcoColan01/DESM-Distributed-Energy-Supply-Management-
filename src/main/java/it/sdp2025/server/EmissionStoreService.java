@@ -2,7 +2,7 @@ package it.sdp2025.server;
 
 import it.sdp2025.common.Emission;
 import it.sdp2025.common.EmissionAverageMessage;
-import it.sdp2025.simulator.Measurement;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -12,7 +12,7 @@ public class EmissionStoreService {
     private final Map<String, Object> locks = new HashMap<>();
     private final Map<String, NavigableMap<Long, Double>> store = new HashMap<>();
 
-    public void addEmission(EmissionAverageMessage message){
+    public void addEmission(@NotNull EmissionAverageMessage message){
         synchronized (getLock(message.getPlantId())){
             store.computeIfAbsent(message.getPlantId(), k -> new TreeMap<>())
                     .put(message.getTimestamp(), message.getAvgValue());
@@ -38,29 +38,19 @@ public class EmissionStoreService {
     public synchronized List<Emission> getAllMeasurements() {
         List<Emission> measurements = new ArrayList<>();
         for (Map.Entry<String, NavigableMap<Long, Double>> plantEntry : store.entrySet()) {
-
-            String plantId                        = plantEntry.getKey();
+            String plantId = plantEntry.getKey();
             NavigableMap<Long, Double> timeSeries = plantEntry.getValue();
-
-            // … e per ogni misura della sua serie temporale
             for (Map.Entry<Long, Double> m : timeSeries.entrySet()) {
                 long   ts   = m.getKey();
                 double co2  = m.getValue();
-
-                // costruiamo il Measurement con il tuo simulatore:
-                // id  = id della centrale
-                // type= "CO2"  (unico sensore gestito qui)
                 measurements.add(new Emission(plantId, "CO2", co2, ts));
             }
         }
-
-        /* opzionale: ordina sul timestamp (così il controller restituisce
-           un flusso temporale globale ordinato)                       */
         Collections.sort(measurements);
         return List.copyOf(measurements);
     }
 
-    private Object getLock(String id){
+    private Object getLock(@NotNull String id){
         synchronized (locks){
             return locks.computeIfAbsent(id, k -> new Object());
         }
