@@ -16,7 +16,7 @@ public class RenewableEnergyProvider {
     public void start() throws Exception{
         MqttClient client = new MqttClient(BROKER, "ProviderPublisher");
         client.connect();
-        System.out.println("[Provider] connected - publishing every 10s");
+        System.out.println("[Provider] connected");
         while(true){
             long timestamp = System.currentTimeMillis();
             int kwhQty = 5000 + rnd.nextInt(10001);

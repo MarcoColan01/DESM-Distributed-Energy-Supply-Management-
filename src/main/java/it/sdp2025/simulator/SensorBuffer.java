@@ -3,7 +3,6 @@ package it.sdp2025.simulator;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Buffer thread-safe minimalista. */
 public final class SensorBuffer implements Buffer {
 
     private final List<Measurement> data = new ArrayList<>();

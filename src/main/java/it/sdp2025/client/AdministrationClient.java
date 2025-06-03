@@ -1,6 +1,8 @@
 package it.sdp2025.client;
 
+import it.sdp2025.common.Emission;
 import it.sdp2025.common.PlantInfo;
+import it.sdp2025.simulator.Measurement;
 import org.apache.coyote.Response;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
@@ -19,11 +21,13 @@ public class AdministrationClient {
                     == Administration Client Menu ==
                     1) Lista degli impianti
                     2) Media CO2 intervallata
+                    3) Tutte le misurazioni ottenute
                     0) Exit
                     """);
             switch (in.nextLine()) {
                 case "1" -> listOfPlants();
                 case "2" -> calculateAverage();
+                case "3" -> listOfMeasurements();
                 case "0" -> System.exit(0);
             }
         }
@@ -33,6 +37,12 @@ public class AdministrationClient {
         ResponseEntity<PlantInfo[]> response = http.getForEntity(SERVER_ADDRESS + "/plants", PlantInfo[].class);
         Arrays.stream(response.getBody()).forEach(plant ->
                 System.out.printf("• %s @ %s:%d%n", plant.getId(), plant.getHost(), plant.getGrpcPort()));
+    }
+
+    private void listOfMeasurements(){
+        ResponseEntity<Emission[]> response = http.getForEntity(SERVER_ADDRESS + "/emissions/getAll", Emission[].class);
+        Arrays.stream(response.getBody()).forEach(measurement ->
+                System.out.printf("At %,d: @%s %.2f%n", measurement.getTimestamp(), measurement.getId(), measurement.getValue()));
     }
 
     private void calculateAverage(){

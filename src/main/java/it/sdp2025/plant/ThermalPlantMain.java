@@ -11,10 +11,8 @@ import java.util.stream.Collectors;
 public final class ThermalPlantMain {
 
     public static void main(String[] args) throws Exception {
-        System.setProperty("io.netty.tryReflectionSetAccessible", "false");
         final Random rnd = new Random();
 
-        /* 1 ▸ parte un thread che chiede i parametri */
         CliThread cli = new CliThread();
         cli.start();
         CliThread.Params p = cli.waitParams();

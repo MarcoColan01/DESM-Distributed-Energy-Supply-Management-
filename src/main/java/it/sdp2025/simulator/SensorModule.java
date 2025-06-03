@@ -5,11 +5,7 @@ import com.google.gson.Gson;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/**
- *  ▸ Avvia un PollutionSensor (thread proprietario)
- *  ▸ Gestisce finestra scorrevole di 8 misurazioni, overlap 50 %
- *  ▸ Ogni 10 s pubblica su topic   desm/emissions   la lista delle medie calcolate
- */
+
 public final class SensorModule {
 
     private static final int   WINDOW_SIZE = 8;
@@ -24,18 +20,16 @@ public final class SensorModule {
     private static String plantId;
     private static String brokerUrl;
 
-    private SensorModule() {} // no-instance
+    private SensorModule() {}
 
     public static void start(String id, String mqttBroker) {
         plantId   = id;
         brokerUrl = mqttBroker;
         sharedBuffer = new SensorBuffer();
 
-        /* ➊ – avvia thread simulatore */
         sensorThread = new PollutionSensor(id, sharedBuffer);
         sensorThread.start();
 
-        /* ➋ – thread di calcolo e invio */
         computeThread = new Thread(SensorModule::computeLoop, "SensorCompute-"+id);
         computeThread.setDaemon(true);
         computeThread.start();
@@ -54,7 +48,6 @@ public final class SensorModule {
                             .mapToDouble(Double::doubleValue)
                             .average().orElse(0.0);
                     averagesToSend.add(avg);
-                    /* rimuovi le prime 4 (overlap 50 %) */
                     window.subList(0, SLIDE).clear();
                 }
             }
@@ -75,7 +68,7 @@ public final class SensorModule {
         try (MqttClient client = new MqttClient(brokerUrl,
                 "SensorPub-"+plantId+"-"+ts)) {
             client.connect();
-
+            System.out.println(averagesToSend.size());
             for (Double avg : averagesToSend) {
                 Map<String,Object> msg = Map.of(
                         "plantId",   plantId,
@@ -91,11 +84,5 @@ public final class SensorModule {
             e.printStackTrace();
         }
         averagesToSend.clear();
-    }
-
-    /* facoltativo – per chiudere il modulo */
-    public static void stop() {
-        if (sensorThread != null) sensorThread.stopMeGently();
-        if (computeThread != null) computeThread.interrupt();
     }
 }
