@@ -10,11 +10,12 @@ public class ElectionManager {
     private final TopologyManager topology;
     private final GrpcClient grpcClient;
 
-    private double bestOffer = Double.MAX_VALUE;
-    private String bestOfferId = null;
-    private long currentTimestamp = -1;
+    private double bestOffer;
+    private String bestOfferId;
+    private long currentTimestamp;
     private boolean isCoordinator = false;
     private boolean busy = false;
+    private boolean isProducing = false;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -22,11 +23,12 @@ public class ElectionManager {
         this.nodeId = nodeId;
         this.topology = topology;
         this.grpcClient = grpcClient;
+        clearBusy();  // inizializza le variabili correttamente
     }
 
-    public synchronized void startElectionIfFree(double offer, long timestamp) {
-        if (busy && currentTimestamp == timestamp)
-            return;
+    public synchronized boolean startElectionIfFree(double offer, long timestamp) {
+        if (busy || isProducing)
+            return false;
 
         busy = true;
         currentTimestamp = timestamp;
@@ -42,50 +44,57 @@ public class ElectionManager {
                     .setBestId(nodeId)
                     .setInitiatorId(nodeId)
                     .build();
-
             executor.submit(() -> grpcClient.forwardElection(nextId, msg));
         } else {
             becomeCoordinator();
         }
+        return true;
     }
 
     public synchronized void handleElection(PlantNetwork.ElectionMsg msg) {
-        System.out.printf("[%s] RING attuale: %s%n", nodeId, topology.getPlants());
-        System.out.printf("[%s] Ricevuto token, offerta: %.3f, starter: %s, bestId: %s, bestOffer: %.3f%n",
-                nodeId, bestOffer, msg.getInitiatorId(), msg.getBestId(), msg.getOffer());
-
+        String starterId = msg.getInitiatorId();
         double offer = msg.getOffer();
         long timestamp = msg.getTimestamp();
         String bestIdReceived = msg.getBestId();
-        String starterId = msg.getInitiatorId();
 
-        if (currentTimestamp != -1 && currentTimestamp != timestamp) {
-            System.out.printf("[%s] Ignora election per timestamp %d: sto già gestendo %d%n", nodeId, timestamp, currentTimestamp);
+        System.out.printf("[%s] RING attuale: %s%n", nodeId, topology.getPlants());
+        System.out.printf("[%s] Ricevuto token, offerta: %.3f, starter: %s, bestId: %s%n",
+                nodeId, offer, starterId, bestIdReceived);
+
+        if (busy && currentTimestamp != timestamp) {
+            System.out.printf("[%s] Passo token per timestamp %d (sto già gestendo %d)%n",
+                    nodeId, timestamp, currentTimestamp);
+            forwardToken(msg);
             return;
         }
 
         busy = true;
         currentTimestamp = timestamp;
 
-        if (offer < bestOffer || bestOfferId == null) {
+        if (bestOfferId == null ||
+                offer < bestOffer ||
+                (offer == bestOffer && bestIdReceived.compareTo(bestOfferId) > 0)) {
             bestOffer = offer;
             bestOfferId = bestIdReceived;
         }
 
         if (starterId.equals(nodeId)) {
             becomeCoordinator();
-            clearBusy();
+            clearBusy(); // Libera lo stato post-elezione
         } else {
-            String nextId = topology.getSuccessor();
             PlantNetwork.ElectionMsg newMsg = PlantNetwork.ElectionMsg.newBuilder()
                     .setOffer(bestOffer)
                     .setTimestamp(timestamp)
                     .setBestId(bestOfferId)
                     .setInitiatorId(starterId)
                     .build();
-
-            executor.submit(() -> grpcClient.forwardElection(nextId, newMsg));
+            forwardToken(newMsg);
         }
+    }
+
+    private void forwardToken(PlantNetwork.ElectionMsg msg) {
+        String nextId = topology.getSuccessor();
+        executor.submit(() -> grpcClient.forwardElection(nextId, msg));
     }
 
     private void becomeCoordinator() {
@@ -93,7 +102,8 @@ public class ElectionManager {
         if (isCoordinator) {
             System.out.printf("[%s] *** COORDINATORE (%.3f) req %d ***%n", nodeId, bestOffer, currentTimestamp);
         } else {
-            System.out.printf("[%s] Coordinatore eletto: %s (%.3f) per richiesta %d%n", nodeId, bestOfferId, bestOffer, currentTimestamp);
+            System.out.printf("[%s] Coordinatore eletto: %s (%.3f) per richiesta %d%n",
+                    nodeId, bestOfferId, bestOffer, currentTimestamp);
         }
     }
 
@@ -107,6 +117,14 @@ public class ElectionManager {
         bestOffer = Double.MAX_VALUE;
         bestOfferId = null;
         currentTimestamp = -1;
+    }
+
+    public synchronized boolean isProducing() {
+        return isProducing;
+    }
+
+    public synchronized void setProducing(boolean producing) {
+        isProducing = producing;
     }
 
     public void shutdown() {
