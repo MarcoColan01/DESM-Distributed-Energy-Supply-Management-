@@ -2,132 +2,181 @@ package it.sdp2025.plant;
 
 import it.sdp2025.PlantNetwork;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
+/**
+ * Gestisce l’elezione ad anello (Chang & Roberts) fra le centrali
+ * e lo stato locale della centrale stessa.
+ *
+ *   • busy          – true se la centrale sta elaborando un’ELEZIONE
+ *   • isCoordinator – true solo per la centrale vincitrice
+ *   • isProducing   – true mentre la centrale sta fisicamente producendo
+ *
+ * Zero dipendenze da java.util.concurrent: i token gRPC sono inoltrati
+ * con un semplice new Thread().
+ */
 public class ElectionManager {
-    private final String nodeId;
-    private final TopologyManager topology;
-    private final GrpcClient grpcClient;
 
-    private double bestOffer;
-    private String bestOfferId;
-    private long currentTimestamp;
-    private boolean isCoordinator = false;
-    private boolean busy = false;
-    private boolean isProducing = false;
+    /* ------------------------- campi -------------------------------- */
 
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final String           nodeId;
+    private final TopologyManager  topology;
+    private final GrpcClient       grpcClient;
 
-    public ElectionManager(String nodeId, TopologyManager topology, GrpcClient grpcClient) {
-        this.nodeId = nodeId;
-        this.topology = topology;
+    private double  bestOffer;
+    private String  bestOfferId;
+    private long    currentTimestamp;
+
+    private boolean busy;
+    private boolean isCoordinator;
+    private boolean isProducing;
+
+    /* ---------------------- costruttore ----------------------------- */
+
+    public ElectionManager(String nodeId,
+                           TopologyManager topology,
+                           GrpcClient grpcClient) {
+
+        this.nodeId     = nodeId;
+        this.topology   = topology;
         this.grpcClient = grpcClient;
-        clearBusy();  // inizializza le variabili correttamente
+        clearBusy();            // inizializza tutti i flag
+        isProducing = false;
     }
 
+    /* ================================================================ */
+    /* ===========  API INVOCATE DAL THREAD PRINCIPALE  =============== */
+    /* ================================================================ */
+
+    /**
+     * Avvia un’elezione se la centrale è libera.
+     * @return true se l’elezione parte, false se la centrale era impegnata.
+     */
     public synchronized boolean startElectionIfFree(double offer, long timestamp) {
-        if (busy || isProducing)
-            return false;
 
-        busy = true;
+        if (busy || isProducing) return false;   // già occupata
+
+        busy             = true;
         currentTimestamp = timestamp;
-        bestOffer = offer;
-        bestOfferId = nodeId;
-        isCoordinator = false;
+        bestOffer        = offer;
+        bestOfferId      = nodeId;
+        isCoordinator    = false;
 
-        String nextId = topology.getSuccessor();
-        if (!nextId.equals(nodeId)) {
-            PlantNetwork.ElectionMsg msg = PlantNetwork.ElectionMsg.newBuilder()
+        String next = topology.getSuccessor();
+
+        if (!next.equals(nodeId)) {
+            PlantNetwork.ElectionMsg msg = PlantNetwork.ElectionMsg
+                    .newBuilder()
                     .setOffer(offer)
                     .setTimestamp(timestamp)
                     .setBestId(nodeId)
                     .setInitiatorId(nodeId)
                     .build();
-            executor.submit(() -> grpcClient.forwardElection(nextId, msg));
+            forwardToken(msg);                   // parte l’anello
         } else {
+            // anello di un solo nodo: eleggiti subito
             becomeCoordinator();
         }
         return true;
     }
 
+    /** @return true se *questa* centrale è coordinatore per quel timestamp. */
+    public synchronized boolean isCoordinatorFor(long timestamp) {
+        return isCoordinator && currentTimestamp == timestamp;
+    }
+
+    public synchronized boolean isProducing()               { return isProducing; }
+    public synchronized void    setProducing(boolean flag)   { isProducing = flag; }
+
+    /** Chiamare quando la centrale ha finito di produrre. */
+    public synchronized void productionFinished() {
+        isProducing = false;
+        clearBusy();                 // pronta per altre elezioni
+    }
+
+    /* ================================================================ */
+    /* ==============  HANDLER CHIAMATO DAL SERVER gRPC  ============== */
+    /* ================================================================ */
+
+    /** Token d’elezione ricevuto da un altro nodo dell’anello. */
     public synchronized void handleElection(PlantNetwork.ElectionMsg msg) {
-        String starterId = msg.getInitiatorId();
-        double offer = msg.getOffer();
-        long timestamp = msg.getTimestamp();
+
+        String starterId      = msg.getInitiatorId();
+        double offer          = msg.getOffer();
+        long   ts             = msg.getTimestamp();
         String bestIdReceived = msg.getBestId();
 
-        System.out.printf("[%s] RING attuale: %s%n", nodeId, topology.getPlants());
-        System.out.printf("[%s] Ricevuto token, offerta: %.3f, starter: %s, bestId: %s%n",
-                nodeId, offer, starterId, bestIdReceived);
-
-        if (busy && currentTimestamp != timestamp) {
-            System.out.printf("[%s] Passo token per timestamp %d (sto già gestendo %d)%n",
-                    nodeId, timestamp, currentTimestamp);
+        /* 1) Se sto già gestendo un’elezione *diversa*, passo il token. */
+        if (busy && currentTimestamp != ts) {
             forwardToken(msg);
             return;
         }
 
-        busy = true;
-        currentTimestamp = timestamp;
+        /* 2) Aggiorna lo stato per *questa* elezione. */
+        busy             = true;
+        currentTimestamp = ts;
 
         if (bestOfferId == null ||
                 offer < bestOffer ||
                 (offer == bestOffer && bestIdReceived.compareTo(bestOfferId) > 0)) {
-            bestOffer = offer;
+
+            bestOffer   = offer;
             bestOfferId = bestIdReceived;
         }
 
+        /* 3) Se il token ha completato il giro… */
         if (starterId.equals(nodeId)) {
-            becomeCoordinator();
-            clearBusy(); // Libera lo stato post-elezione
+
+            becomeCoordinator();   // stampa e setta isCoordinator
+
+            if (!isCoordinator) {  // lo starter NON vincitore si libera
+                clearBusy();
+            }
+            /* Il coordinatore resta busy finché produce.  */
         } else {
-            PlantNetwork.ElectionMsg newMsg = PlantNetwork.ElectionMsg.newBuilder()
+            /* 4) Nodo intermedio: inoltra e libera subito lo stato. */
+            PlantNetwork.ElectionMsg newMsg = PlantNetwork.ElectionMsg
+                    .newBuilder()
                     .setOffer(bestOffer)
-                    .setTimestamp(timestamp)
+                    .setTimestamp(ts)
                     .setBestId(bestOfferId)
                     .setInitiatorId(starterId)
                     .build();
             forwardToken(newMsg);
+            clearBusy();          // <--  IMPORTANTE: non resta “bloccato”
         }
     }
 
+    /* ================================================================ */
+    /* ==================  METODI DI UTILITÀ PRIVATI  ================= */
+    /* ================================================================ */
+
+    /** Inoltra il token al successore in un nuovo thread. */
     private void forwardToken(PlantNetwork.ElectionMsg msg) {
-        String nextId = topology.getSuccessor();
-        executor.submit(() -> grpcClient.forwardElection(nextId, msg));
+        String next = topology.getSuccessor();
+        new Thread(() -> grpcClient.forwardElection(next, msg)).start();
     }
 
+    /** Aggiorna i flag e stampa il risultato dell’elezione. */
     private void becomeCoordinator() {
-        isCoordinator = bestOfferId.equals(nodeId);
+        isCoordinator = nodeId.equals(bestOfferId);
+
         if (isCoordinator) {
-            System.out.printf("[%s] *** COORDINATORE (%.3f) req %d ***%n", nodeId, bestOffer, currentTimestamp);
+            System.out.printf("[%s] *** COORDINATORE (%.3f) req %d ***%n",
+                    nodeId, bestOffer, currentTimestamp);
         } else {
             System.out.printf("[%s] Coordinatore eletto: %s (%.3f) per richiesta %d%n",
                     nodeId, bestOfferId, bestOffer, currentTimestamp);
         }
     }
 
-    public synchronized boolean isCoordinatorFor(long timestamp) {
-        return isCoordinator && currentTimestamp == timestamp;
-    }
-
-    public synchronized void clearBusy() {
-        busy = false;
-        isCoordinator = false;
-        bestOffer = Double.MAX_VALUE;
-        bestOfferId = null;
+    /** Riporta la centrale allo stato “idle” (nessuna elezione in corso). */
+    private void clearBusy() {
+        busy             = false;
+        isCoordinator    = false;
+        bestOffer        = Double.MAX_VALUE;
+        bestOfferId      = null;
         currentTimestamp = -1;
     }
 
-    public synchronized boolean isProducing() {
-        return isProducing;
-    }
-
-    public synchronized void setProducing(boolean producing) {
-        isProducing = producing;
-    }
-
-    public void shutdown() {
-        executor.shutdown();
-    }
+    /* Nessuna risorsa long-living da chiudere. */
+    public void shutdown() {}
 }

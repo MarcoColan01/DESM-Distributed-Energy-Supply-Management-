@@ -52,16 +52,18 @@ public final class ThermalPlantMain {
 
         while (true) {
             if (elect.isCoordinatorFor(sub.lastTimestamp()) && !elect.isProducing()) {
+
                 int qty = sub.lastQuantity();
                 System.out.printf("[%s] PRODUZIONE di %d kWh%n", p.id, qty);
-                elect.setProducing(true);
-                Thread.sleep(qty);
-                System.out.printf("[%s] FINITO PRODUZIONE%n", p.id);
-                elect.setProducing(false);
-                elect.clearBusy();
-            }
 
+                elect.setProducing(true);          // blocca la centrale
+                Thread.sleep(qty);                 // 1 ms × kWh richiesti
+                System.out.printf("[%s] FINITO PRODUZIONE%n", p.id);
+
+                elect.productionFinished();        // libera lo stato
+            }
             Thread.sleep(50);
         }
+
     }
 }
