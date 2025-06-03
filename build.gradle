@@ -3,6 +3,7 @@ plugins {
     id "java"
     id 'org.springframework.boot' version '2.4.0'
     id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+    id 'application'
 }
 
 group 'org.example'
@@ -32,6 +33,7 @@ dependencies {
     // Spring Web for REST
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.jetbrains:annotations:24.1.0'
+    //implementation 'org.slf4j:slf4j-simple:1.7.30'
 
 
     // MQTT Dependencies
@@ -72,3 +74,10 @@ protobuf {
 test {
     useJUnitPlatform()
 }
+
+application {
+    applicationDefaultJvmArgs = [
+            "-Djava.util.logging.config.file=src/main/resources/logging.properties"
+    ]
+}
+
