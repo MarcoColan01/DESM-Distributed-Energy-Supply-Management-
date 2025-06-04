@@ -18,7 +18,7 @@ public class GrpcServer extends PlantServiceGrpc.PlantServiceImplBase {
     }
 
     @Override
-    public void forwardElection(@NotNull PlantNetwork.ElectionMsg request, @NotNull StreamObserver<Empty> responseObserver) {
+    public void forwardElection(@NotNull PlantNetwork.ElectionMessage request, @NotNull StreamObserver<Empty> responseObserver) {
         try {
             System.out.printf("[GrpcServer] Received forwardElection from %s%n", request.getInitiatorId());
             electionMgr.handleElection(request);
@@ -33,7 +33,7 @@ public class GrpcServer extends PlantServiceGrpc.PlantServiceImplBase {
     }
 
     @Override
-    public void announceJoin(@NotNull PlantNetwork.PlantInfoMsg request, @NotNull StreamObserver<Empty> responseObserver) {
+    public void announceJoin(@NotNull PlantNetwork.PlantInfoMessage request, @NotNull StreamObserver<Empty> responseObserver) {
         try {
             System.out.printf("[GrpcServer] Received announceJoin from %s%n", request.getId());
             topo.addPlant(request.getId());

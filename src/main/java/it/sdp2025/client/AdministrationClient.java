@@ -2,11 +2,8 @@ package it.sdp2025.client;
 
 import it.sdp2025.common.Emission;
 import it.sdp2025.common.PlantInfo;
-import it.sdp2025.simulator.Measurement;
-import org.apache.coyote.Response;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
-
 import java.util.Arrays;
 import java.util.Scanner;
 
@@ -19,7 +16,7 @@ public class AdministrationClient {
         while (true) {
             System.out.println("""
                     == Administration Client Menu ==
-                    1) Lista degli impianti
+                    1) Lista degli impianti in rete
                     2) Media CO2 intervallata
                     3) Tutte le misurazioni ottenute
                     0) Exit
@@ -47,9 +44,9 @@ public class AdministrationClient {
     }
 
     private void calculateAverage(){
-        System.out.print("t1 (ms): ");
+        System.out.print("Inserisci timestamp di inizio: ");
         long t1 = Long.parseLong(in.nextLine());
-        System.out.print("t2 (ms): ");
+        System.out.print("Inserisci timestamp di fine: ");
         long t2 = Long.parseLong(in.nextLine());
         if(t1 >= t2){
             System.out.println("L'inizio dell'intervallo non può essere successivo alla fine");
@@ -58,7 +55,7 @@ public class AdministrationClient {
         String url = SERVER_ADDRESS + "/emissions/average?t1=" + t1 + "&t2=" + t2;
         ResponseEntity<Double> r = http.getForEntity(url, Double.class);
         if (r.getStatusCode().is2xxSuccessful())
-            System.out.printf("Media CO₂ = %.2f g%n", r.getBody());
+            System.out.printf("Media CO2 = %.2f g%n", r.getBody());
         else System.out.printf("Nessun dato nell'intervallo %.2f - %.2f", t1, t2);
     }
 

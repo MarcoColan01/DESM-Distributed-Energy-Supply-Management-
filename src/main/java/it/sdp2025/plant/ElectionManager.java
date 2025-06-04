@@ -34,7 +34,7 @@ public class ElectionManager {
         String next = topology.getSuccessor();
 
         if (!next.equals(nodeId)) {
-            PlantNetwork.ElectionMsg msg = PlantNetwork.ElectionMsg
+            PlantNetwork.ElectionMessage msg = PlantNetwork.ElectionMessage
                     .newBuilder()
                     .setOffer(offer)
                     .setTimestamp(timestamp)
@@ -57,14 +57,16 @@ public class ElectionManager {
 
     public synchronized void setProducing(boolean flag)   {
         isProducing = flag;
+        notifyAll();
     }
 
     public synchronized void productionFinished() {
         isProducing = false;
         clearBusy();
+        notifyAll();
     }
 
-    public synchronized void handleElection(@NotNull PlantNetwork.ElectionMsg msg) {
+    public synchronized void handleElection(@NotNull PlantNetwork.ElectionMessage msg) {
         String starterId      = msg.getInitiatorId();
         double offer          = msg.getOffer();
         long   ts             = msg.getTimestamp();
@@ -96,7 +98,7 @@ public class ElectionManager {
                 clearBusy();
             }
         } else {
-            PlantNetwork.ElectionMsg newMsg = PlantNetwork.ElectionMsg
+            PlantNetwork.ElectionMessage newMsg = PlantNetwork.ElectionMessage
                     .newBuilder()
                     .setOffer(bestOffer)
                     .setTimestamp(ts)
@@ -108,7 +110,7 @@ public class ElectionManager {
         }
     }
 
-    private void forwardToken(@NotNull PlantNetwork.ElectionMsg msg) {
+    private void forwardToken(@NotNull PlantNetwork.ElectionMessage msg) {
         String next = topology.getSuccessor();
         new Thread(() -> grpcClient.forwardElection(next, msg)).start();
     }
@@ -123,6 +125,7 @@ public class ElectionManager {
                     nodeId, bestOfferId, bestOffer, currentTimestamp);
         }
         lastPrintedTs = currentTimestamp;
+        notifyAll();
     }
 
     private void clearBusy() {

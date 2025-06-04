@@ -3,16 +3,17 @@ package it.sdp2025;
 import "google/protobuf/empty.proto";
 
 
-message PlantInfoMsg {
+message PlantInfoMessage {
   string id   = 1;
   string host = 2;
   int32  port = 3;
 }
 
-/* —— Election —— */
-enum ElecType { ELECTION = 0; ELECTED = 1; }
+enum ElecType {
+  ELECTION = 0; ELECTED = 1;
+}
 
-message ElectionMsg {
+message ElectionMessage {
   double offer = 1;
   int64 timestamp = 2;
   string bestId = 3;
@@ -21,6 +22,6 @@ message ElectionMsg {
 
 
 service PlantService {
-  rpc forwardElection   (ElectionMsg) returns (google.protobuf.Empty);
-  rpc announceJoin      (PlantInfoMsg) returns (google.protobuf.Empty);
+  rpc forwardElection (ElectionMessage) returns (google.protobuf.Empty);
+  rpc announceJoin (PlantInfoMessage) returns (google.protobuf.Empty);
 }

@@ -25,7 +25,7 @@ public final class GrpcClient {
         System.out.printf("[GrpcClient] Connected to %s at %s:%d%n", id, host, port);
     }
 
-    public void forwardElection(@NotNull String idSucc, @NotNull PlantNetwork.ElectionMsg msg) {
+    public void forwardElection(@NotNull String idSucc, @NotNull PlantNetwork.ElectionMessage msg) {
         PlantServiceGrpc.PlantServiceStub stub = stubs.get(idSucc);
         if (stub == null) {
             System.err.printf("[GrpcClient] No stub for %s%n", idSucc);
@@ -45,7 +45,7 @@ public final class GrpcClient {
     }
 
     public void announceJoinAll(@NotNull PlantInfo me, @NotNull Collection<PlantInfo> peers) {
-        PlantNetwork.PlantInfoMsg self = PlantNetwork.PlantInfoMsg.newBuilder()
+        PlantNetwork.PlantInfoMessage self = PlantNetwork.PlantInfoMessage.newBuilder()
                 .setId(me.getId()).setHost(me.getHost()).setPort(me.getGrpcPort()).build();
         for (PlantInfo p : peers) {
             connect(p.getId(), p.getHost(), p.getGrpcPort());
