@@ -13,6 +13,7 @@ public final class CliThread extends Thread {
         public final String adminHost;
         public final int adminPort;
         public final String mqttBroker;
+
         private Params(String id, int grpcPort, @NotNull String adminHost, int adminPort, @NotNull String mqttBroker){
             Objects.requireNonNull(id, "L'id della centrale non può essere null");
             if(id.isEmpty()) throw new IllegalArgumentException("L'id della centrale non può essere vuoto");
@@ -31,10 +32,10 @@ public final class CliThread extends Thread {
         Scanner in = new Scanner(System.in);
 
        try{
-           System.out.print("Inserisci ID centrale              > ");
+           System.out.print("Inserisci ID centrale: ");
            String id = in.nextLine().trim();
 
-           System.out.print("Inserisci porta gRPC                > ");
+           System.out.print("Inserisci porta gRPC: ");
            int grpcPort = Integer.parseInt(in.nextLine().trim());
 
            params = new Params(id,

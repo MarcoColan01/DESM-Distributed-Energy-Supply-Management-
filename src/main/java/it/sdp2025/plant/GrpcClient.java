@@ -18,56 +18,56 @@ public final class GrpcClient {
 
     public void connect(@NotNull String id, @NotNull String host, int port) {
         if (stubs.containsKey(id)) return;
-        ManagedChannel ch = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
-        PlantServiceGrpc.PlantServiceStub stub = PlantServiceGrpc.newStub(ch);
+        ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+        PlantServiceGrpc.PlantServiceStub stub = PlantServiceGrpc.newStub(channel);
         stubs.put(id, stub);
-        channels.put(id, ch);
+        channels.put(id, channel);
         System.out.printf("[GrpcClient] Connected to %s at %s:%d%n", id, host, port);
     }
 
-    public void forwardElection(@NotNull String idSucc, @NotNull PlantNetwork.ElectionMessage msg) {
+    public void forwardElection(@NotNull String idSucc, @NotNull PlantNetwork.ElectionMessage message) {
         PlantServiceGrpc.PlantServiceStub stub = stubs.get(idSucc);
         if (stub == null) {
             System.err.printf("[GrpcClient] No stub for %s%n", idSucc);
             return;
         }
-        stub.forwardElection(msg, new StreamObserver<>() {
+        stub.forwardElection(message, new StreamObserver<>() {
             public void onNext(com.google.protobuf.Empty ignore) {
-                System.out.printf("[GrpcClient] forwardElection: response received from %s%n", idSucc);
+                //System.out.printf("[GrpcClient] forwardElection: response received from %s%n", idSucc);
             }
             public void onError(Throwable t) {
                 System.err.printf("[GrpcClient] forwardElection: ERROR from %s: %s%n", idSucc, t);
             }
             public void onCompleted() {
-                System.out.printf("[GrpcClient] forwardElection: completed with %s%n", idSucc);
+                //System.out.printf("[GrpcClient] forwardElection: completed with %s%n", idSucc);
             }
         });
     }
 
-    public void announceJoinAll(@NotNull PlantInfo me, @NotNull Collection<PlantInfo> peers) {
+    public void announceJoinAll(@NotNull PlantInfo plantInfo, @NotNull Collection<PlantInfo> peers) {
         PlantNetwork.PlantInfoMessage self = PlantNetwork.PlantInfoMessage.newBuilder()
-                .setId(me.getId()).setHost(me.getHost()).setPort(me.getGrpcPort()).build();
-        for (PlantInfo p : peers) {
-            connect(p.getId(), p.getHost(), p.getGrpcPort());
-            PlantServiceGrpc.PlantServiceStub stub = stubs.get(p.getId());
+                .setId(plantInfo.getId()).setHost(plantInfo.getHost()).setPort(plantInfo.getGrpcPort()).build();
+        for (PlantInfo peer : peers) {
+            connect(peer.getId(), peer.getHost(), peer.getGrpcPort());
+            PlantServiceGrpc.PlantServiceStub stub = stubs.get(peer.getId());
             stub.announceJoin(self, new StreamObserver<>() {
                 public void onNext(com.google.protobuf.Empty ignore) {
-                    System.out.printf("[GrpcClient] announceJoin: response received from %s%n", p.getId());
+                    //System.out.printf("[GrpcClient] announceJoin: response received from %s%n", peer.getId());
                 }
                 public void onError(Throwable t) {
-                    System.err.printf("[GrpcClient] announceJoin: ERROR from %s: %s%n", p.getId(), t);
+                    System.err.printf("[GrpcClient] announceJoin: ERROR from %s: %s%n", peer.getId(), t);
                 }
                 public void onCompleted() {
-                    System.out.printf("[GrpcClient] announceJoin: completed with %s%n", p.getId());
+                    //System.out.printf("[GrpcClient] announceJoin: completed with %s%n", peer.getId());
                 }
             });
         }
     }
 
-    public void shutdown() {
-        for (var ch : channels.values()) {
-            ch.shutdownNow();
-        }
-        System.out.println("[GrpcClient] All channels shut down.");
-    }
+//    public void shutdown() {
+//        for (var channel : channels.values()) {
+//            channel.shutdownNow();
+//        }
+//        System.out.println("[GrpcClient] All channels shut down.");
+//    }
 }

@@ -4,20 +4,20 @@ import it.sdp2025.PlantNetwork;
 import org.jetbrains.annotations.NotNull;
 
 public class ElectionManager {
-    private final String           nodeId;
-    private final TopologyManager  topology;
-    private final GrpcClient       grpcClient;
-    private double  bestOffer;
-    private String  bestOfferId;
-    private long    currentTimestamp;
+    private final String nodeId;
+    private final TopologyManager topology;
+    private final GrpcClient grpcClient;
+    private double bestOffer;
+    private String bestOfferId;
+    private long currentTimestamp;
     private boolean busy;
     private boolean isCoordinator;
     private boolean isProducing;
     private long lastPrintedTs = -1;
 
     public ElectionManager(@NotNull String nodeId, @NotNull TopologyManager topology, @NotNull GrpcClient grpcClient) {
-        this.nodeId     = nodeId;
-        this.topology   = topology;
+        this.nodeId = nodeId;
+        this.topology = topology;
         this.grpcClient = grpcClient;
         clearBusy();
         isProducing = false;
@@ -26,22 +26,22 @@ public class ElectionManager {
     public synchronized void startElectionIfFree(double offer, long timestamp) {
         if (busy || isProducing) return;
 
-        busy             = true;
+        busy = true;
         currentTimestamp = timestamp;
-        bestOffer        = offer;
-        bestOfferId      = nodeId;
-        isCoordinator    = false;
+        bestOffer = offer;
+        bestOfferId = nodeId;
+        isCoordinator = false;
         String next = topology.getSuccessor();
 
         if (!next.equals(nodeId)) {
-            PlantNetwork.ElectionMessage msg = PlantNetwork.ElectionMessage
+            PlantNetwork.ElectionMessage message = PlantNetwork.ElectionMessage
                     .newBuilder()
                     .setOffer(offer)
                     .setTimestamp(timestamp)
                     .setBestId(nodeId)
                     .setInitiatorId(nodeId)
                     .build();
-            forwardToken(msg);
+            forwardToken(message);
         } else {
             becomeCoordinator();
         }
@@ -55,8 +55,8 @@ public class ElectionManager {
         return isProducing;
     }
 
-    public synchronized void setProducing(boolean flag)   {
-        isProducing = flag;
+    public synchronized void setProducing(boolean producing)   {
+        isProducing = producing;
         notifyAll();
     }
 
@@ -66,53 +66,50 @@ public class ElectionManager {
         notifyAll();
     }
 
-    public synchronized void handleElection(@NotNull PlantNetwork.ElectionMessage msg) {
-        String starterId      = msg.getInitiatorId();
-        double offer          = msg.getOffer();
-        long   ts             = msg.getTimestamp();
-        String bestIdReceived = msg.getBestId();
+    public synchronized void handleElection(@NotNull PlantNetwork.ElectionMessage message) {
+        String initiatorId = message.getInitiatorId();
+        double offer = message.getOffer();
+        long timestamp = message.getTimestamp();
+        String bestIdMsg = message.getBestId();
 
-        if (busy && currentTimestamp != ts) {
-            if (ts != lastPrintedTs) {
+        if (busy && currentTimestamp != timestamp) {
+            if (timestamp != lastPrintedTs) {
                 System.out.printf("[%s] Coordinatore eletto: %s (%.3f) per richiesta %d%n",
-                        nodeId, msg.getBestId(), msg.getOffer(), ts);
-                lastPrintedTs = ts;
+                        nodeId, message.getBestId(), message.getOffer(), timestamp);
+                lastPrintedTs = timestamp;
             }
-            forwardToken(msg);
+            forwardToken(message);
             return;
         }
-        busy             = true;
-        currentTimestamp = ts;
+        busy = true;
+        currentTimestamp = timestamp;
 
-        if (bestOfferId == null ||
-                offer < bestOffer ||
-                (offer == bestOffer && bestIdReceived.compareTo(bestOfferId) > 0)) {
-
+        if (bestOfferId == null || offer < bestOffer || (offer == bestOffer && bestIdMsg.compareTo(bestOfferId) > 0)) {
             bestOffer   = offer;
-            bestOfferId = bestIdReceived;
+            bestOfferId = bestIdMsg;
         }
 
-        if (starterId.equals(nodeId)) {
+        if (initiatorId.equals(nodeId)) {
             becomeCoordinator();
             if (!isCoordinator) {
                 clearBusy();
             }
         } else {
-            PlantNetwork.ElectionMessage newMsg = PlantNetwork.ElectionMessage
+            PlantNetwork.ElectionMessage newMessage = PlantNetwork.ElectionMessage
                     .newBuilder()
                     .setOffer(bestOffer)
-                    .setTimestamp(ts)
+                    .setTimestamp(timestamp)
                     .setBestId(bestOfferId)
-                    .setInitiatorId(starterId)
+                    .setInitiatorId(initiatorId)
                     .build();
-            forwardToken(newMsg);
+            forwardToken(newMessage);
             clearBusy();
         }
     }
 
-    private void forwardToken(@NotNull PlantNetwork.ElectionMessage msg) {
+    private void forwardToken(@NotNull PlantNetwork.ElectionMessage message) {
         String next = topology.getSuccessor();
-        new Thread(() -> grpcClient.forwardElection(next, msg)).start();
+        new Thread(() -> grpcClient.forwardElection(next, message)).start();
     }
 
     private void becomeCoordinator() {
@@ -136,5 +133,5 @@ public class ElectionManager {
         currentTimestamp = -1;
     }
 
-    public void shutdown() {}
+    //public void shutdown() {}
 }

@@ -27,8 +27,8 @@ public final class MqttEnergySubscriber {
                 cause.printStackTrace();
             }
 
-            public void messageArrived(String topic, MqttMessage msg) {
-                String json = new String(msg.getPayload(), StandardCharsets.UTF_8);
+            public void messageArrived(String topic, MqttMessage message) {
+                String json = new String(message.getPayload(), StandardCharsets.UTF_8);
                 EnergyRequest req = gson.fromJson(json, EnergyRequest.class);
                 last = req;
                 onRequest.accept(req);

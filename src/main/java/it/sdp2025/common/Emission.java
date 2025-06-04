@@ -1,6 +1,5 @@
 package it.sdp2025.common;
 
-import it.sdp2025.simulator.Measurement;
 import org.jetbrains.annotations.NotNull;
 
 public class Emission implements Comparable<Emission>{
