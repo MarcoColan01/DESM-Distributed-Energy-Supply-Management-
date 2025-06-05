@@ -63,7 +63,7 @@ public final class SensorModule {
         try (MqttClient client = new MqttClient(brokerUrl,
                 "SensorPub-"+plantId+"-"+ts)) {
             client.connect();
-            System.out.println(averages.size());
+            //System.out.println(averages.size());
             for (Double avg : averages) {
                 Map<String,Object> msg = Map.of(
                         "plantId",   plantId,

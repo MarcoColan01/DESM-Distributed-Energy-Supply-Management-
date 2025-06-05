@@ -51,38 +51,51 @@ public final class ThermalPlantMain {
 
         sub.connect();
         SensorModule.start(p.id, p.mqttBroker);
+
         /* ------------------------------------------------------------------
-         *  Dopo l’inizializzazione (uguale a prima) il main thread
-         *  resta in attesa di diventare coordinatore: niente busy-waiting,
-         *  nessun thread aggiuntivo creato dall’applicazione.
+         *  Loop principale per gestire la produzione di energia
          * ------------------------------------------------------------------ */
         for (;;) {
             int qty;
+            long timestamp;
 
             /* ATTENDO la condizione ------------------------ */
             synchronized (elect) {
-                while (!(elect.isCoordinatorFor(sub.lastTimestamp()) &&
-                        !elect.isProducing())) {
-                    elect.wait();                 // sospensione reale
+                // Continua ad attendere finché non sono coordinatore E libero di produrre
+                while (true) {
+                    timestamp = sub.lastTimestamp();
+                    if (timestamp != -1 &&
+                            elect.isCoordinatorFor(timestamp) &&
+                            !elect.isProducing()) {
+                        break; // Condizione soddisfatta, posso produrre
+                    }
+                    elect.wait(); // Attendo che la condizione diventi vera
                 }
 
                 /* Qui la condizione è vera: sono coordinatore, libero di produrre */
                 qty = sub.lastQuantity();
                 System.out.printf("[%s] RICHIESTA %,d: PRODUZIONE di %d kWh%n",
-                        p.id, sub.lastTimestamp(), qty);
-                elect.setProducing(true);         // flag + notifyAll()
+                        p.id, timestamp, qty);
+                elect.setProducing(true); // Imposto il flag di produzione
             }
 
-            /* Produzione (fuori da synchronized) ----------- */
-            Thread.sleep(qty);                    // 1 ms × kWh simulati
+            /* Produzione (fuori da synchronized per non bloccare altri thread) */
+            try {
+                Thread.sleep(qty); // 1 ms × kWh simulati
+            } catch (InterruptedException e) {
+                System.err.printf("[%s] Produzione interrotta per richiesta %d%n", p.id, timestamp);
+                synchronized (elect) {
+                    elect.productionFinished();
+                }
+                continue;
+            }
 
             /* Fine produzione ------------------------------ */
             synchronized (elect) {
                 System.out.printf("[%s] RICHIESTA %,d: FINITO PRODUZIONE di %d kWh%n",
-                        p.id, sub.lastTimestamp(), qty);
-                elect.productionFinished();       // reset + notifyAll()
+                        p.id, timestamp, qty);
+                elect.productionFinished(); // Reset flags e notifica
             }
         }
-
     }
 }
