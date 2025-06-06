@@ -6,13 +6,11 @@ import it.sdp2025.common.PlantInfo;
 import it.sdp2025.simulator.SensorModule;
 
 import java.util.List;
-import java.util.Random;
 import java.util.stream.Collectors;
 
 public final class ThermalPlantMain {
 
     public static void main(String[] args) throws Exception {
-        final Random rnd = new Random();
         CliThread cli = new CliThread();
         cli.start();
         CliThread.Params p = cli.waitParams();
@@ -40,61 +38,48 @@ public final class ThermalPlantMain {
         MqttEnergySubscriber sub = new MqttEnergySubscriber(
                 p.mqttBroker,
                 req -> {
-                    double price = 0.1 + 0.8 * rnd.nextDouble();
-                    System.out.printf("[%s] OFFERTA %.3f $/kWh per req %d%n",
-                            p.id, price, req.getTimestamp());
-                    elect.startElectionIfFree(price, req.getTimestamp());
-
-                    /* risveglia il main thread in caso la condizione diventi vera */
-                    synchronized (elect) { elect.notifyAll(); }
+                    // Gestisce la richiesta tramite l'ElectionManager (con buffer)
+                    elect.handleEnergyRequest(req);
                 });
 
         sub.connect();
         SensorModule.start(p.id, p.mqttBroker);
 
-        /* ------------------------------------------------------------------
-         *  Loop principale per gestire la produzione di energia
-         * ------------------------------------------------------------------ */
+        // Loop principale modificato per gestire sia richieste correnti che buffer
         for (;;) {
             int qty;
             long timestamp;
 
-            /* ATTENDO la condizione ------------------------ */
             synchronized (elect) {
-                // Continua ad attendere finché non sono coordinatore E libero di produrre
-                while (true) {
-                    timestamp = sub.lastTimestamp();
-                    if (timestamp != -1 &&
-                            elect.isCoordinatorFor(timestamp) &&
-                            !elect.isProducing()) {
-                        break; // Condizione soddisfatta, posso produrre
-                    }
-                    elect.wait(); // Attendo che la condizione diventi vera
+                // Aspetta finché non ho lavoro da fare
+                while (!elect.hasWorkToDo(sub.lastTimestamp())) {
+                    elect.wait();
                 }
 
-                /* Qui la condizione è vera: sono coordinatore, libero di produrre */
-                qty = sub.lastQuantity();
+                // Verifico se sono coordinatore per la richiesta corrente
+                if (elect.isCoordinatorFor(sub.lastTimestamp()) && !elect.isProducing()) {
+                    // Processo la richiesta corrente
+                    qty = sub.lastQuantity();
+                    timestamp = sub.lastTimestamp();
+                } else {
+                    // Controllo se ci sono richieste nel buffer da processare
+                    elect.checkPendingRequests();
+                    continue; // Torna al wait per aspettare di diventare coordinatore
+                }
+
                 System.out.printf("[%s] RICHIESTA %,d: PRODUZIONE di %d kWh%n",
                         p.id, timestamp, qty);
-                elect.setProducing(true); // Imposto il flag di produzione
+                elect.setProducing(true);
             }
 
-            /* Produzione (fuori da synchronized per non bloccare altri thread) */
-            try {
-                Thread.sleep(qty); // 1 ms × kWh simulati
-            } catch (InterruptedException e) {
-                System.err.printf("[%s] Produzione interrotta per richiesta %d%n", p.id, timestamp);
-                synchronized (elect) {
-                    elect.productionFinished();
-                }
-                continue;
-            }
+            // Produzione (fuori da synchronized)
+            Thread.sleep(qty);
 
-            /* Fine produzione ------------------------------ */
+            // Fine produzione
             synchronized (elect) {
                 System.out.printf("[%s] RICHIESTA %,d: FINITO PRODUZIONE di %d kWh%n",
                         p.id, timestamp, qty);
-                elect.productionFinished(); // Reset flags e notifica
+                elect.productionFinished(); // Questo controllerà automaticamente il buffer
             }
         }
     }

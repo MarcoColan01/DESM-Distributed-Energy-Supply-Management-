@@ -23,7 +23,7 @@ public class RenewableEnergyProvider {
             String message = gson.toJson(new EnergyRequest(kwhQty, timestamp));
             client.publish(TOPIC, new MqttMessage(message.getBytes()));
             System.out.printf("[Provider] request %d kWh%n", kwhQty);
-            Thread.sleep(10000);
+            Thread.sleep(5000);
         }
     }
 
