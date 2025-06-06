@@ -1,8 +1,6 @@
 package it.sdp2025.plant;
 
 import it.sdp2025.common.EnergyRequest;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedList;
 import java.util.Queue;
@@ -20,7 +18,7 @@ public class RequestBuffer {
     /**
      * Aggiunge una richiesta al buffer
      */
-    public void addRequest(@NotNull EnergyRequest request) {
+    public void addRequest(EnergyRequest request) {
         synchronized (lock) {
             pendingRequests.offer(request);
             System.out.printf("[BUFFER] Richiesta %d accodata (buffer size: %d)%n",
@@ -31,7 +29,6 @@ public class RequestBuffer {
     /**
      * Rimuove e restituisce la prima richiesta dal buffer, o null se vuoto
      */
-    @Nullable
     public EnergyRequest getNextRequest() {
         synchronized (lock) {
             EnergyRequest request = pendingRequests.poll();
@@ -64,7 +61,6 @@ public class RequestBuffer {
     /**
      * Restituisce la prima richiesta senza rimuoverla dal buffer
      */
-    @Nullable
     public EnergyRequest peekNext() {
         synchronized (lock) {
             return pendingRequests.peek();

@@ -44,6 +44,8 @@ public class ElectionManager {
      * Se il nodo è libero, avvia un'elezione. Altrimenti, accoda la richiesta.
      */
     public synchronized void handleEnergyRequest(@NotNull EnergyRequest request) {
+        System.out.printf("[DEBUG %s] handleEnergyRequest: busy=%b, isProducing=%b, timestamp=%d%n",
+                nodeId, busy, isProducing, request.getTimestamp());
         long timestamp = request.getTimestamp();
 
         // Evita di processare richieste duplicate
@@ -97,6 +99,8 @@ public class ElectionManager {
      * Verifica se ci sono richieste in buffer da processare e avvia un'elezione se necessario
      */
     public synchronized void checkPendingRequests() {
+        System.out.printf("[DEBUG %s] checkPendingRequests: busy=%b, isProducing=%b, bufferSize=%d%n",
+                nodeId, busy, isProducing, requestBuffer.size());
         if (!busy && !isProducing && !requestBuffer.isEmpty()) {
             // Filtra le richieste già processate
             EnergyRequest nextRequest;
