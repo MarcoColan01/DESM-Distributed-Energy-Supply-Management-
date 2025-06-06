@@ -37,54 +37,39 @@ public final class ThermalPlantMain {
 
         MqttEnergySubscriber sub = new MqttEnergySubscriber(
                 p.mqttBroker,
-                req -> {
-                    // Gestisce la richiesta tramite l'ElectionManager (con buffer)
-                    elect.handleEnergyRequest(req);
-                });
+                elect::handleEnergyRequest);
 
         sub.connect();
         SensorModule.start(p.id, p.mqttBroker);
 
-        // Contatore per dare priorità alle richieste buffer dopo la produzione
         int bufferCheckCounter = 0;
 
-        // Loop principale modificato per gestire sia richieste correnti che buffer
         for (;;) {
             int qty;
             long timestamp;
 
             synchronized (elect) {
-                // Aspetta finché non ho lavoro da fare
                 while (!elect.hasWorkToDo(sub.lastTimestamp())) {
                     elect.wait();
                 }
-
-                // Se ho appena finito la produzione, controlla prima il buffer
                 if (elect.finishedProduction()) {
                     elect.resetJustFinishedFlag();
-                    bufferCheckCounter = 3; // Dai priorità al buffer per i prossimi 3 cicli
+                    bufferCheckCounter = 3;
                 }
-
-                // Se devo dare priorità al buffer, controlla prima quello
                 if (bufferCheckCounter > 0) {
                     elect.checkPendingRequests();
                     bufferCheckCounter--;
-
-                    // Se ho iniziato un'elezione dal buffer, continua
                     if (elect.getBusy()) {
                         continue;
                     }
                 }
 
-                // Verifico se sono coordinatore per la richiesta corrente
                 if (elect.isCoordinatorFor(sub.lastTimestamp()) && !elect.isProducing()) {
-                    // Processo la richiesta corrente
                     qty = sub.lastQuantity();
                     timestamp = sub.lastTimestamp();
                 } else {
-                    // Controllo se ci sono richieste nel buffer da processare
                     elect.checkPendingRequests();
-                    continue; // Torna al wait per aspettare di diventare coordinatore
+                    continue;
                 }
 
                 System.out.printf("[%s] RICHIESTA %,d: PRODUZIONE di %d kWh%n",
@@ -92,19 +77,12 @@ public final class ThermalPlantMain {
                 elect.setProducing(true);
             }
 
-            // Produzione (fuori da synchronized)
             Thread.sleep(qty);
 
-            // Fine produzione
             synchronized (elect) {
                 System.out.printf("[%s] RICHIESTA %,d: FINITO PRODUZIONE di %d kWh%n",
                         p.id, timestamp, qty);
                 elect.productionFinished();
-            }
-
-            // Cleanup periodico delle richieste vecchie (ogni 100 iterazioni)
-            if (timestamp % 100 == 0) {
-                elect.cleanupOldRequests(System.currentTimeMillis());
             }
         }
     }

@@ -5,19 +5,10 @@ import it.sdp2025.common.EnergyRequest;
 import java.util.LinkedList;
 import java.util.Queue;
 
-/**
- * Buffer thread-safe per accodare le richieste di energia che non possono
- * essere immediatamente processate perché tutte le centrali sono occupate.
- *
- * Implementazione senza java.util.concurrent come richiesto dal progetto.
- */
 public class RequestBuffer {
     private final Queue<EnergyRequest> pendingRequests = new LinkedList<>();
     private final Object lock = new Object();
 
-    /**
-     * Aggiunge una richiesta al buffer
-     */
     public void addRequest(EnergyRequest request) {
         synchronized (lock) {
             pendingRequests.offer(request);
@@ -26,9 +17,6 @@ public class RequestBuffer {
         }
     }
 
-    /**
-     * Rimuove e restituisce la prima richiesta dal buffer, o null se vuoto
-     */
     public EnergyRequest getNextRequest() {
         synchronized (lock) {
             EnergyRequest request = pendingRequests.poll();
@@ -40,39 +28,16 @@ public class RequestBuffer {
         }
     }
 
-    /**
-     * Verifica se il buffer è vuoto
-     */
     public boolean isEmpty() {
         synchronized (lock) {
             return pendingRequests.isEmpty();
         }
     }
 
-    /**
-     * Restituisce il numero di richieste in coda
-     */
-    public int size() {
-        synchronized (lock) {
-            return pendingRequests.size();
-        }
-    }
-
-    /**
-     * Restituisce la prima richiesta senza rimuoverla dal buffer
-     */
     public EnergyRequest peekNext() {
         synchronized (lock) {
             return pendingRequests.peek();
         }
     }
 
-    /**
-     * Rimuove tutte le richieste che soddisfano una condizione
-     */
-    public void removeIf(java.util.function.Predicate<EnergyRequest> condition) {
-        synchronized (lock) {
-            pendingRequests.removeIf(condition);
-        }
-    }
 }
