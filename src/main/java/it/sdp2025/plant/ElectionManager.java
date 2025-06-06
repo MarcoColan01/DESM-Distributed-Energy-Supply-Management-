@@ -23,6 +23,7 @@ public class ElectionManager {
     private boolean busy;           // Partecipa ad un'elezione
     private boolean isCoordinator;  // È il coordinatore per l'elezione corrente
     private boolean isProducing;    // Sta producendo energia
+    private boolean justFinishedProduction; // Flag per indicare che ha appena finito di produrre
 
     // Tracciamento delle richieste già processate
     private final Set<Long> processedRequests = new HashSet<>();
@@ -37,6 +38,7 @@ public class ElectionManager {
         this.requestBuffer = new RequestBuffer();
         clearElectionState();
         isProducing = false;
+        justFinishedProduction = false;
     }
 
     /**
@@ -128,6 +130,14 @@ public class ElectionManager {
             requestBuffer.getNextRequest();
             startElection(nextRequest);
         }
+    }
+
+    public synchronized boolean getBusy(){
+        return busy;
+    }
+
+    public synchronized boolean finishedProduction(){
+        return justFinishedProduction;
     }
 
     /**
@@ -257,7 +267,7 @@ public class ElectionManager {
     /**
      * Inoltra il token al successore nell'anello
      */
-    private void forwardToken(@NotNull PlantNetwork.ElectionMessage message) {
+    private void forwardToken(PlantNetwork.ElectionMessage message) {
         String next = topology.getSuccessor();
         // Usa un thread separato per evitare blocchi
         new Thread(() -> grpcClient.forwardElection(next, message)).start();
@@ -280,33 +290,29 @@ public class ElectionManager {
     public synchronized void productionFinished() {
         isProducing = false;
         clearElectionState(); // Reset completo dello stato
-
-        // Notifica immediatamente che il nodo è libero
+        justFinishedProduction = true; // Segnala che ha appena finito la produzione
         notifyAll();
-
-        // Controlla se ci sono richieste in coda da processare
-        // Usa un delay minimo per evitare race condition con messaggi in arrivo
-        new Thread(() -> {
-            try {
-                Thread.sleep(100); // Delay leggermente aumentato per maggiore sicurezza
-                synchronized (this) {
-                    if (!busy && !isProducing) {
-                        checkPendingRequests();
-                    }
-                    notifyAll();
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }).start();
     }
 
     /**
      * Verifica se ci sono richieste da processare (buffer o coordinatore)
      */
     public synchronized boolean hasWorkToDo(long lastTimestamp) {
+        // Se ho appena finito la produzione, segnala che c'è lavoro da fare
+        // per permettere al main di controllare il buffer
+        if (justFinishedProduction) {
+            return true;
+        }
+
         return (isCoordinatorFor(lastTimestamp) && !isProducing()) ||
                 (!busy && !isProducing && !requestBuffer.isEmpty());
+    }
+
+    /**
+     * Resetta il flag di produzione appena terminata
+     */
+    public synchronized void resetJustFinishedFlag() {
+        justFinishedProduction = false;
     }
 
     /**

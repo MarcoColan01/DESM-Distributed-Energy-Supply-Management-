@@ -45,6 +45,9 @@ public final class ThermalPlantMain {
         sub.connect();
         SensorModule.start(p.id, p.mqttBroker);
 
+        // Contatore per dare priorità alle richieste buffer dopo la produzione
+        int bufferCheckCounter = 0;
+
         // Loop principale modificato per gestire sia richieste correnti che buffer
         for (;;) {
             int qty;
@@ -54,6 +57,23 @@ public final class ThermalPlantMain {
                 // Aspetta finché non ho lavoro da fare
                 while (!elect.hasWorkToDo(sub.lastTimestamp())) {
                     elect.wait();
+                }
+
+                // Se ho appena finito la produzione, controlla prima il buffer
+                if (elect.finishedProduction()) {
+                    elect.resetJustFinishedFlag();
+                    bufferCheckCounter = 3; // Dai priorità al buffer per i prossimi 3 cicli
+                }
+
+                // Se devo dare priorità al buffer, controlla prima quello
+                if (bufferCheckCounter > 0) {
+                    elect.checkPendingRequests();
+                    bufferCheckCounter--;
+
+                    // Se ho iniziato un'elezione dal buffer, continua
+                    if (elect.getBusy()) {
+                        continue;
+                    }
                 }
 
                 // Verifico se sono coordinatore per la richiesta corrente
@@ -79,7 +99,12 @@ public final class ThermalPlantMain {
             synchronized (elect) {
                 System.out.printf("[%s] RICHIESTA %,d: FINITO PRODUZIONE di %d kWh%n",
                         p.id, timestamp, qty);
-                elect.productionFinished(); // Questo controllerà automaticamente il buffer
+                elect.productionFinished();
+            }
+
+            // Cleanup periodico delle richieste vecchie (ogni 100 iterazioni)
+            if (timestamp % 100 == 0) {
+                elect.cleanupOldRequests(System.currentTimeMillis());
             }
         }
     }
