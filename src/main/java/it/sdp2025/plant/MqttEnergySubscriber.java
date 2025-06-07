@@ -36,10 +36,9 @@ public final class MqttEnergySubscriber {
 
             public void deliveryComplete(IMqttDeliveryToken token) {}
         });
-
         client.connect();
         client.subscribe("desm/energy", 1);
-        System.out.println("[MQTT] sottoscritto desm/energy");
+        System.out.println("[MQTT Richieste energia] sottoscritto desm/energy");
     }
 
     public long lastTimestamp() {

@@ -48,8 +48,6 @@ public class Emission implements Comparable<Emission>{
         this.type = type;
     }
 
-
-
     public String toString(){
         return value + " " + timestamp;
     }

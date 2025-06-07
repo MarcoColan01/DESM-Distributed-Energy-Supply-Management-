@@ -12,19 +12,15 @@ public class ElectionManager {
     private final TopologyManager topology;
     private final GrpcClient grpcClient;
     private final RequestBuffer requestBuffer;
-
     private double myOffer;
     private double bestOffer;
     private String bestOfferId;
     private long currentTimestamp;
-
     private boolean busy;
     private boolean isCoordinator;
     private boolean isProducing;
     private boolean justFinishedProduction;
-
     private final Set<Long> processedRequests = new HashSet<>();
-
     private long lastPrintedTs = -1;
 
     public ElectionManager(@NotNull String nodeId, @NotNull TopologyManager topology, @NotNull GrpcClient grpcClient) {
@@ -80,14 +76,14 @@ public class ElectionManager {
         EnergyRequest nextRequest = null;
 
         while (!requestBuffer.isEmpty()) {
-            nextRequest = requestBuffer.peekNext();
+            nextRequest = requestBuffer.nextRequest();
             if (nextRequest == null) {
                 break;
             }
 
             if (processedRequests.contains(nextRequest.getTimestamp())) {
                 requestBuffer.getNextRequest();
-                System.out.printf("[BUFFER] Richiesta %d già processata, rimossa dal buffer%n",
+                System.out.printf("[BUFFER] Richiesta %d già soddisfatta%n",
                         nextRequest.getTimestamp());
                 nextRequest = null;
             } else {

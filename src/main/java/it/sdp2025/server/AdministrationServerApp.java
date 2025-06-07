@@ -7,6 +7,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class AdministrationServerApp {
     public static void main(String[] args) {
         SpringApplication.run(AdministrationServerApp.class, args);
-        System.out.println("Admin-server up at http://localhost:8080");
+        System.out.println("Administration server up at http://localhost:8080");
     }
 }

@@ -15,7 +15,7 @@ public class AdministrationClient {
     private void loop() {
         while (true) {
             System.out.println("""
-                    == Administration Client Menu ==
+                    == Administration Client - Scegliere un comando ==
                     1) Lista degli impianti in rete
                     2) Media CO2 intervallata
                     3) Tutte le misurazioni ottenute

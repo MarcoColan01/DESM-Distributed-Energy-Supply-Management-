@@ -11,8 +11,8 @@ import java.nio.charset.StandardCharsets;
 
 @Component
 public class MqttEmissionSubscriber {
-    private static final String BROKER = "tcp://localhost:1883";
-    private static final String TOPIC = "desm/emissions";
+    private static final String BROKER_ADDRESS = "tcp://localhost:1883";
+    private static final String SUBSCRIBE_TOPIC = "desm/emissions";
 
     @Autowired
     private EmissionStoreService emissionStore;
@@ -21,7 +21,7 @@ public class MqttEmissionSubscriber {
 
     @PostConstruct
     public void init() throws MqttException {
-        this.client = new MqttClient(BROKER, "AdminServerSubscriber");
+        this.client = new MqttClient(BROKER_ADDRESS, "AdminServerSubscriber");
         client.connect();
         client.setCallback(new MqttCallback() {
             @Override
@@ -30,11 +30,12 @@ public class MqttEmissionSubscriber {
             }
 
             @Override
-            public void messageArrived(String s, MqttMessage mqttMessage) throws Exception {
+            public void messageArrived(String s, MqttMessage mqttMessage) {
                 String json = new String(mqttMessage.getPayload(), StandardCharsets.UTF_8);
                 EmissionAverageMessage message = gson.fromJson(json, EmissionAverageMessage.class);
                 emissionStore.addEmission(message);
-                System.out.printf("[MQTT] avg %.2f g da %s%n", message.getAvgValue(), message.getPlantId());
+                System.out.printf("[Servizio emissioni server](%,2d) ricevuto %.2f g da %s%n",
+                        message.getTimestamp(), message.getAvgValue(), message.getPlantId());
             }
 
             @Override
@@ -43,8 +44,8 @@ public class MqttEmissionSubscriber {
             }
         });
 
-        client.subscribe(TOPIC, 1);
-        System.out.println("[MQTT] Subscribed to " + TOPIC);
+        client.subscribe(SUBSCRIBE_TOPIC, 1);
+        System.out.println("[Servizio emissioni server] Subscribed to " + SUBSCRIBE_TOPIC);
     }
 
 }

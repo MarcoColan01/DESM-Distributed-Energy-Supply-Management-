@@ -22,24 +22,22 @@ public final class GrpcClient {
         PlantServiceGrpc.PlantServiceStub stub = PlantServiceGrpc.newStub(channel);
         stubs.put(id, stub);
         channels.put(id, channel);
-        System.out.printf("[GrpcClient] Connected to %s at %s:%d%n", id, host, port);
+        System.out.printf("[GrpcClient] Connesso a %s at %s:%d%n", id, host, port);
     }
 
     public void forwardElection(@NotNull String idSucc, @NotNull PlantNetwork.ElectionMessage message) {
         PlantServiceGrpc.PlantServiceStub stub = stubs.get(idSucc);
         if (stub == null) {
-            System.err.printf("[GrpcClient] No stub for %s%n", idSucc);
+            System.err.printf("[GrpcClient] No stub per %s%n", idSucc);
             return;
         }
         stub.forwardElection(message, new StreamObserver<>() {
             public void onNext(com.google.protobuf.Empty ignore) {
-                //System.out.printf("[GrpcClient] forwardElection: response received from %s%n", idSucc);
             }
             public void onError(Throwable t) {
                 System.err.printf("[GrpcClient] forwardElection: ERROR from %s: %s%n", idSucc, t);
             }
             public void onCompleted() {
-                //System.out.printf("[GrpcClient] forwardElection: completed with %s%n", idSucc);
             }
         });
     }
@@ -58,7 +56,7 @@ public final class GrpcClient {
                     System.err.printf("[GrpcClient] announceJoin: ERROR from %s: %s%n", peer.getId(), t);
                 }
                 public void onCompleted() {
-                    //System.out.printf("[GrpcClient] announceJoin: completed with %s%n", peer.getId());
+                    //
                 }
             });
         }

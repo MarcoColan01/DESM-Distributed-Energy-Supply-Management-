@@ -23,7 +23,8 @@ public final class TopologyManager {
 
     public synchronized void addPlant(@NotNull String id) {
         if (!ring.contains(id)) {
-            ring.add(id); Collections.sort(ring);
+            ring.add(id);
+            Collections.sort(ring);
             System.out.printf("[%s] RING → %s%n", myId, ring);
         }
     }

@@ -17,7 +17,7 @@ public final class ThermalPlantMain {
 
         PlantRegistration admin = new PlantRegistration(p.adminHost, p.adminPort);
         List<PlantInfo> peers = admin.register(p.id, p.grpcPort);
-        System.out.println("[ADMIN] registrato – peer ricevuti: " + peers.size());
+        System.out.println("[SERVER] Centrale registrata – peer ricevuti: " + peers.size());
 
         TopologyManager topo = new TopologyManager(p.id);
         topo.initRing(
@@ -33,7 +33,7 @@ public final class ThermalPlantMain {
         Server server = ServerBuilder.forPort(p.grpcPort)
                 .addService(new GrpcServer(elect, topo, grpcClient))
                 .build().start();
-        System.out.printf("[gRPC] %s listening on %d%n", p.id, p.grpcPort);
+        System.out.printf("[gRPC] %s in ascolto su %d%n", p.id, p.grpcPort);
 
         MqttEnergySubscriber sub = new MqttEnergySubscriber(
                 p.mqttBroker,

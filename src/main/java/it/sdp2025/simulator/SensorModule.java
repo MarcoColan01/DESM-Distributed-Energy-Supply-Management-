@@ -51,9 +51,9 @@ public final class SensorModule {
                 publishAverages(now);
                 lastPublish = now;
             }
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {}
+//            try {
+//                Thread.sleep(500);
+//            } catch (InterruptedException e) {}
         }
     }
 
@@ -63,7 +63,6 @@ public final class SensorModule {
         try (MqttClient client = new MqttClient(brokerUrl,
                 "SensorPub-"+plantId+"-"+ts)) {
             client.connect();
-            //System.out.println(averages.size());
             for (Double avg : averages) {
                 Map<String,Object> msg = Map.of(
                         "plantId",   plantId,

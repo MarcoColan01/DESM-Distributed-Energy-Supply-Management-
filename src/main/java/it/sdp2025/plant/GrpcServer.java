@@ -22,14 +22,12 @@ public class GrpcServer extends PlantServiceGrpc.PlantServiceImplBase {
     public void forwardElection(@NotNull PlantNetwork.ElectionMessage message,
                                 @NotNull StreamObserver<Empty> responseObserver) {
         try {
-            //System.out.printf("[GrpcServer] Received forwardElection from %s%n", message.getInitiatorId());
             electionManager.handleElection(message);
             responseObserver.onNext(Empty.getDefaultInstance());
             responseObserver.onCompleted();
-            //System.out.println("[GrpcServer] forwardElection: response sent and completed.");
         } catch (Exception e) {
             responseObserver.onError(e);
-            System.err.println("[GrpcServer] forwardElection: error occurred.");
+            System.err.println("[GrpcServer] forwardElection: errore");
             e.printStackTrace();
         }
     }
@@ -38,17 +36,13 @@ public class GrpcServer extends PlantServiceGrpc.PlantServiceImplBase {
     public void announceJoin(@NotNull PlantNetwork.PlantInfoMessage message,
                              @NotNull StreamObserver<Empty> responseObserver) {
         try {
-            //System.out.printf("[GrpcServer] Received announceJoin from %s%n", request.getId());
             topologyManager.addPlant(message.getId());
             client.connect(message.getId(), message.getHost(), message.getPort());
             System.out.printf("[%s] RING (post-join) → %s%n", topologyManager.getMyId(), topologyManager.getPlants());
             responseObserver.onNext(Empty.getDefaultInstance());
             responseObserver.onCompleted();
-            //System.out.println("[GrpcServer] announceJoin: response sent and completed.");
         } catch (Exception e) {
             responseObserver.onError(e);
-            //System.err.println("[GrpcServer] announceJoin: error occurred.");
-            //e.printStackTrace();
         }
     }
 }

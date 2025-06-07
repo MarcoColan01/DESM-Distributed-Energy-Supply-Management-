@@ -34,7 +34,7 @@ public class RequestBuffer {
         }
     }
 
-    public EnergyRequest peekNext() {
+    public EnergyRequest nextRequest() {
         synchronized (lock) {
             return pendingRequests.peek();
         }
