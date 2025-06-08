@@ -24,7 +24,7 @@ public final class SensorModule {
         plantId = id;
         brokerUrl = mqttBroker;
         buffer = new SensorBuffer();
-        pollutionSensor = new PollutionSensor(id, buffer);
+        pollutionSensor = new PollutionSensor(buffer);
         pollutionSensor.start();
         computeThread = new Thread(SensorModule::computeLoop, "SensorCompute-"+id);
         computeThread.setDaemon(true);
