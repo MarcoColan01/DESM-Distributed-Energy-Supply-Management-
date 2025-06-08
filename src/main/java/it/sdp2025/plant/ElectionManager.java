@@ -50,6 +50,7 @@ public class ElectionManager {
 
     private void startElection(@NotNull EnergyRequest request) {
         double offer = 0.1 + 0.8 * Math.random();
+        //offer = Math.floor(offer * 10) / 10;
         long timestamp = request.getTimestamp();
         processedRequests.add(timestamp);
         System.out.printf("[%s] OFFERTA %.3f $/kWh per req %d%n", nodeId, offer, timestamp);
@@ -132,7 +133,8 @@ public class ElectionManager {
                 forwardToken(message);
                 return;
             }
-            double myOffer = 0.1 + 0.8 * Math.random();
+            double offer = 0.1 + 0.8 * Math.random();
+            //offer = Math.floor(offer * 10) / 10;
             initializeElection(myOffer, timestamp);
             processedRequests.add(timestamp);
             System.out.printf("[%s] OFFERTA %.3f $/kWh per req %d%n",

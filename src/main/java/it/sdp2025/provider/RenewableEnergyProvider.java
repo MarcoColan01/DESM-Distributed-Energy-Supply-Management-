@@ -17,39 +17,30 @@ public class RenewableEnergyProvider {
     private MqttClient client;
     private Timer timer;
 
-    public void start() throws Exception {
-        client = new MqttClient(BROKER_ADDRESS, "ProviderPublisher");
+    public void start() throws Exception{
+        MqttClient client = new MqttClient(BROKER_ADDRESS, "ProviderPublisher");
         client.connect();
-        System.out.println("[Renewable Energy Provider] CONNESSO");
-        timer = new Timer(true);
-        timer.scheduleAtFixedRate(new TimerTask() {
-                                      @Override
-                                      public void run() {
-                                          try {
-                                              long timestamp = System.currentTimeMillis();
-                                              int kwhQty = 5_000 + rnd.nextInt(10_001);
-                                              String payload = gson.toJson(new EnergyRequest(kwhQty, timestamp));
-                                              client.publish(PUBLISH_TOPIC, new MqttMessage(payload.getBytes()));
-                                              System.out.printf("[Renewable Energy Provider] %,d: Pubblicata richiesta per %d kWh%n",
-                                                      timestamp, kwhQty);
-                                          } catch (Exception e) {}
-                                      }
-                                  }, 0L, 10_000L);
-
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            timer.cancel();
+        System.out.println("[Provider] connected");
+        while (!Thread.currentThread().isInterrupted()) {
             try {
-                client.disconnect();
-            } catch (Exception ignored) { }
-            //System.out.println("[Renewable Energy Provider] stopped");
-        }));
-
-        synchronized (this) {
-            this.wait();
+                long timestamp = System.currentTimeMillis();
+                int kwhQty = 5000 + rnd.nextInt(10001);
+                String message = gson.toJson(new EnergyRequest(kwhQty, timestamp));
+                client.publish(PUBLISH_TOPIC, new MqttMessage(message.getBytes()));
+                System.out.printf("[Provider] request %d kWh%n", kwhQty);
+                Thread.sleep(10000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.out.println("[Provider] Publishing interrupted, stopping...");
+                break;
+            } catch (Exception e) {
+                System.err.println("[Provider] Error publishing message: " + e.getMessage());
+            }
         }
+        System.out.println("[Provider] Publishing stopped");
     }
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws Exception{
         new RenewableEnergyProvider().start();
     }
 }
