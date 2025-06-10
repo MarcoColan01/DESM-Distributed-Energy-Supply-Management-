@@ -62,10 +62,10 @@ public final class GrpcClient {
         }
     }
 
-//    public void shutdown() {
-//        for (var channel : channels.values()) {
-//            channel.shutdownNow();
-//        }
-//        System.out.println("[GrpcClient] All channels shut down.");
-//    }
+    public void shutdown() {
+        for (var channel : channels.values()) {
+            channel.shutdownNow();
+        }
+        System.out.println("[GrpcClient] All channels shut down.");
+    }
 }
